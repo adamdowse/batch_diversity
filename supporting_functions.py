@@ -189,18 +189,24 @@ def k_diversity(model,train_ds,k,batch_size):
         i = the item index that we are scoring
         grads = the list of aproximate gradients for this index [...]
         '''
+        #if length is 0?TODO
         #calculate the euclidean distance between the last layer gradients
+        #we want this to be minimal
         new_dists = distance.cdist(grads[i],grads[current_indexes],metric='euclidean')
         return np.min(new_dists,axis=1)
 
-    def calc_outer_diversity(current_indexes,batch_centers,i,grads,k):
+    def calc_outer_diversity(current_indexes,i,grads,k):
         #calc the distance between the modified batch with the item included to the other batches
         #the score is 1/ the distance 
+        #we want this to be the max
+        #TODO should this just be the relationship between sucsessive batches? and not all of them?
+        batch_centers = np.array([np.mean(grads[inds],axis=1) for inds in current_indexes]) #TODO check this is [[],[],]
+        batch_centers = np.delete(batch_centers,k,axis=0)
         new_batch_center = np.mean(np.append(grads[current_indexes],grads[i]),axis=1)
         print(new_batch_center)
-        new_dists = distance.cdist(new_batch_center,np.delete(batch_centers,k,axis=0))
+        new_dists = distance.cdist(new_batch_center,batch_centers)
         new_dists = 1/new_dists
-        return np.min(new_dists,axis=1)
+        return np.max(new_dists,axis=1)
 
     #collect the gradient information for all images
     #last layer gradients from coresets for data efficient training (logits - onehot_label)
@@ -229,24 +235,28 @@ def k_diversity(model,train_ds,k,batch_size):
         for batch_num in range(k):
             #calc inner batch distance
             current_batch_indexes = batch_indexes[batch_num]
-            
+            if len(current_batch_indexes) == 0:
+                #k_means cluster?
 
-            #calculate inner and outer diversity for all the possible new samples
-            item_scores = []
-            for i,grads in enumerate(aprox_grads): 
-                if avalible[i] == 1:
-                    #calc score for each sample
-                    #TODO change the function inputs to match
-                    inner_div_score = calc_inner_diversity(current_batch_indexes,inner_div_store,i,grads)
-                    outer_div_score = calc_outer_diversity(current_batch_indexes)
+            else:
 
-                else:
-                    #cant use this point but used to hold indexing position
-                    item_scores.append(0) #TODO check this dosent break anything
+                #calculate inner and outer diversity for all the possible new samples
+                item_scores = []
+                for i,grads in enumerate(aprox_grads): 
+                    if avalible[i] == 1:
+                        #calc score for each sample
+                        #TODO change the function inputs to match
+                        inner_div_score = calc_inner_diversity(current_batch_indexes[k],i,grads)
+                        outer_div_score = calc_outer_diversity(current_batch_indexes,i,grads,k)
 
-            #combine the scores based on the parameters alpha and beta
+                        #combine the scores based on the parameters alpha and beta
+                        item_scores.append(alpha * inner_div_score + beta * outer_div_score)
+                    else:
+                        #cant use this point but used to hold indexing position
+                        item_scores.append(0) #TODO check this dosent break anything
 
             #pick greedly the best index and add it to the current batch
+
 
 
     #SHould end up with a list of lists of indexes of batches here
