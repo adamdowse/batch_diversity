@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "Main.py", line 53, in <module>
+    model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric = sf.setup_model(config,num_classes,img_size)
+TypeError: setup_model() takes 2 positional arguments but 3 were given

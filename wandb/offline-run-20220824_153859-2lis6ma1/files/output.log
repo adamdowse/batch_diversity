@@ -1,0 +1,45 @@
+built model with input shape = (28, 28, 1, 1)
+Model: "sequential"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #
+=================================================================
+ conv2d (Conv2D)             (None, 26, 26, 32)        320
+ max_pooling2d (MaxPooling2D  (None, 13, 13, 32)       0
+ )
+ flatten (Flatten)           (None, 5408)              0
+ dense (Dense)               (None, 100)               540900
+ dense_1 (Dense)             (None, 10)                1010
+=================================================================
+Total params: 542,230
+Trainable params: 542,230
+Non-trainable params: 0
+_________________________________________________________________
+There are  188  batches in the warm start
+Started Training
+WARNING:tensorflow:Model was constructed with shape (None, 28, 28, 1) for input KerasTensor(type_spec=TensorSpec(shape=(None, 28, 28, 1), dtype=tf.float32, name='conv2d_input'), name='conv2d_input', description="created by layer 'conv2d_input'"), but it was called on an input with incompatible shape (None, 28, 1, 1).
+WARNING:tensorflow:Model was constructed with shape (None, 28, 28, 1) for input KerasTensor(type_spec=TensorSpec(shape=(None, 28, 28, 1), dtype=tf.float32, name='conv2d_input'), name='conv2d_input', description="created by layer 'conv2d_input'"), but it was called on an input with incompatible shape (None, 28, 1, 1).
+2022-08-24 15:39:04.916141: W tensorflow/core/kernels/data/cache_dataset_ops.cc:856] The calling iterator did not fully read the dataset being cached. In order to avoid unexpected truncation of the dataset, the partially cached contents of the dataset  will be discarded. This can happen if you have an input pipeline similar to `dataset.cache().take(k).repeat()`. You should use `dataset.take(k).cache().repeat()` instead.
+Traceback (most recent call last):
+  File "Main.py", line 83, in <module>
+    sf.k_diversity(model,train_ds,config['k'],config['batch_size'],config['alpha'],config['beta'],conn)
+  File "/com.docker.devenvironments.code/supporting_functions.py", line 261, in k_diversity
+    grads = intermediate_layer_model.predict(img)
+  File "/usr/local/lib/python3.8/dist-packages/keras/utils/traceback_utils.py", line 67, in error_handler
+    raise e.with_traceback(filtered_tb) from None
+  File "/tmp/__autograph_generated_filedbttj2pb.py", line 15, in tf__predict_function
+    retval_ = ag__.converted_call(ag__.ld(step_function), (ag__.ld(self), ag__.ld(iterator)), None, fscope)
+ValueError: in user code:
+    File "/usr/local/lib/python3.8/dist-packages/keras/engine/training.py", line 1845, in predict_function  *
+        return step_function(self, iterator)
+    File "/usr/local/lib/python3.8/dist-packages/keras/engine/training.py", line 1834, in step_function  **
+        outputs = model.distribute_strategy.run(run_step, args=(data,))
+    File "/usr/local/lib/python3.8/dist-packages/keras/engine/training.py", line 1823, in run_step  **
+        outputs = model.predict_step(data)
+    File "/usr/local/lib/python3.8/dist-packages/keras/engine/training.py", line 1791, in predict_step
+        return self(x, training=False)
+    File "/usr/local/lib/python3.8/dist-packages/keras/utils/traceback_utils.py", line 67, in error_handler
+        raise e.with_traceback(filtered_tb) from None
+    ValueError: Exception encountered when calling layer "conv2d" (type Conv2D).
+    Negative dimension size caused by subtracting 3 from 1 for '{{node model/conv2d/Conv2D}} = Conv2D[T=DT_FLOAT, data_format="NHWC", dilations=[1, 1, 1, 1], explicit_paddings=[], padding="VALID", strides=[1, 1, 1, 1], use_cudnn_on_gpu=true](model/Cast, model/conv2d/Conv2D/ReadVariableOp)' with input shapes: [?,28,1,1], [3,3,1,32].
+    Call arguments received by layer "conv2d" (type Conv2D):
+      • inputs=tf.Tensor(shape=(None, 28, 1, 1), dtype=float32)

@@ -1,0 +1,33 @@
+built model with input shape = (28, 28, 1, 1)
+Model: "sequential"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #
+=================================================================
+ conv2d (Conv2D)             (None, 26, 26, 32)        320
+ max_pooling2d (MaxPooling2D  (None, 13, 13, 32)       0
+ )
+ flatten (Flatten)           (None, 5408)              0
+ dense (Dense)               (None, 100)               540900
+ dense_1 (Dense)             (None, 10)                1010
+ softmax (Softmax)           (None, 10)                0
+=================================================================
+Total params: 542,230
+Trainable params: 542,230
+Non-trainable params: 0
+_________________________________________________________________
+There are  188  batches in the warm start
+Started Training
+2022-08-24 15:55:42.417507: W tensorflow/core/kernels/data/cache_dataset_ops.cc:856] The calling iterator did not fully read the dataset being cached. In order to avoid unexpected truncation of the dataset, the partially cached contents of the dataset  will be discarded. This can happen if you have an input pipeline similar to `dataset.cache().take(k).repeat()`. You should use `dataset.take(k).cache().repeat()` instead.
+Traceback (most recent call last):
+  File "Main.py", line 83, in <module>
+    sf.k_diversity(model,train_ds,config['k'],config['batch_size'],config['alpha'],config['beta'],conn)
+  File "/com.docker.devenvironments.code/supporting_functions.py", line 270, in k_diversity
+    aprox_grads.append(np.flatten(grads_to_add)) # list of the grads [[grads],[grads],...]
+  File "/usr/local/lib/python3.8/dist-packages/numpy/__init__.py", line 315, in __getattr__
+    raise AttributeError("module {!r} has no attribute "
+AttributeError: module 'numpy' has no attribute 'flatten'
+(1, 28, 28, 1)
+tf.Tensor([4], shape=(1,), dtype=int64)
+1/1 [==============================] - 0s 90ms/step
+[[ 0.00919545  0.03889227 -0.01938625 -0.00367451 -0.01871503 -0.02556492
+  -0.00064307  0.01785977 -0.00658247  0.00343911]]

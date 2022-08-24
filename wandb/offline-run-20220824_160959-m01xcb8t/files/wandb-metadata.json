@@ -1,0 +1,22 @@
+{
+    "os": "Linux-5.10.102.1-microsoft-standard-WSL2-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "heartbeatAt": "2022-08-24T16:10:00.362747",
+    "startedAt": "2022-08-24T16:09:59.696090",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "Main.py",
+    "codePath": "Main.py",
+    "git": {
+        "remote": "https://github.com/adamdowse/batch_diversity",
+        "commit": "a0a07b78f08bd46b8b0d740abaa9421090d74418"
+    },
+    "email": "adamdowse@hotmail.co.uk",
+    "root": "/com.docker.devenvironments.code",
+    "host": "8ce3616ba42c",
+    "username": "vscode",
+    "executable": "/usr/local/bin/python"
+}
