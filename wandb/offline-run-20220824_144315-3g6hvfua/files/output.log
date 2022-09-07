@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "Main.py", line 53, in <module>
-    model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric = sf.setup_model(config,num_classes,img_size)
-  File "/com.docker.devenvironments.code/supporting_functions.py", line 213, in setup_model
-    model.build(img_shape+1)
-TypeError: can only concatenate tuple (not "int") to tuple

@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "Main.py", line 51, in <module>
-    prnt()
-NameError: name 'prnt' is not defined
