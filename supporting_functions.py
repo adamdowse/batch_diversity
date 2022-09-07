@@ -14,6 +14,7 @@ import wandb
 import supporting_models as sm
 import scipy
 from scipy.spatial.distance import cdist
+from multiprocessing import Pool
 
 
 
@@ -214,47 +215,61 @@ def setup_model(config,num_classes,img_shape):
     test_acc_metric = keras.metrics.CategoricalAccuracy()
     return model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric
 
+def calc_inner_diversity(indexes,batch_num,i,grads):
+    '''
+    current_indexes = list of indexes in this batch [indexes]
+    i = the item index that we are scoring
+    grads = the list of aproximate gradients for this index [...]
+    '''
+    
+    #if length is 0?TODO
+    #calculate the euclidean distance between the last layer gradients
+    #we want this to be minimal
+    current_indexes = indexes[batch_num]
+    current_indexes = current_indexes[current_indexes>=0]
+    new_dists = cdist([grads[i]],grads[current_indexes],metric='euclidean')
+    return np.min(new_dists,axis=1)
+
+def calc_outer_diversity(indexes,i,grads,batch_num,k):
+    #calc the distance between the modified batch with the item included to the other batches
+    #the score is 1/ the distance 
+    
+    #loop though the other batches
+    for b in range(k):
+        current_indexes = indexes[b]
+        current_indexes = np.array(current_indexes[current_indexes>=0],ndmin=1,dtype=int)
+        if b == batch_num:
+            current_indexes = np.append(current_indexes,i)
+        
+        #find mean of the new batch with added item
+        mean_grads = np.expand_dims(np.mean(grads[current_indexes],axis=0),axis=0)
+        if b == 0:
+            batch_centers = mean_grads
+        else:
+            batch_centers = np.concatenate((batch_centers,mean_grads),axis=0)
+
+    #calc dist between new center and the other centers
+    new_dists = cdist([batch_centers[batch_num]],batch_centers[np.arange(len(batch_centers))!=batch_num])
+    #new_dists = 1/new_dists
+    #TODO does this represnt the right formula?
+    return np.min(new_dists,axis=1)
+
+def calc_scores(x):
+    [i,grads] = x
+
+    if i in avalible:
+        #calc score for each sample
+        inner_div_score = calc_inner_diversity(batch_indexes,batch_num,i,aprox_grads)
+        outer_div_score = calc_outer_diversity(batch_indexes,i,aprox_grads,batch_num,k)
+        #TODO add normalization
+        #combine the scores based on the parameters alpha and beta
+        score = alpha * inner_div_score + beta * outer_div_score
+        return score
+        #item_scores = np.concatenate((item_scores,score),axis=0)
+    else:
+        return -1
+
 def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
-
-    def calc_inner_diversity(indexes,batch_num,i,grads):
-        '''
-        current_indexes = list of indexes in this batch [indexes]
-        i = the item index that we are scoring
-        grads = the list of aproximate gradients for this index [...]
-        '''
-        
-        #if length is 0?TODO
-        #calculate the euclidean distance between the last layer gradients
-        #we want this to be minimal
-        current_indexes = indexes[batch_num]
-        current_indexes = current_indexes[current_indexes>=0]
-        new_dists = cdist([grads[i]],grads[current_indexes],metric='euclidean')
-        return np.min(new_dists,axis=1)
-
-    def calc_outer_diversity(indexes,i,grads,batch_num,k):
-        #calc the distance between the modified batch with the item included to the other batches
-        #the score is 1/ the distance 
-        
-        #loop though the other batches
-        for b in range(k):
-            current_indexes = indexes[b]
-            current_indexes = np.array(current_indexes[current_indexes>=0],ndmin=1,dtype=int)
-            if b == batch_num:
-                current_indexes = np.append(current_indexes,i)
-            
-            #find mean of the new batch with added item
-            mean_grads = np.expand_dims(np.mean(grads[current_indexes],axis=0),axis=0)
-            if b == 0:
-                batch_centers = mean_grads
-            else:
-                batch_centers = np.concatenate((batch_centers,mean_grads),axis=0)
-   
-        #calc dist between new center and the other centers
-        new_dists = cdist([batch_centers[batch_num]],batch_centers[np.arange(len(batch_centers))!=batch_num])
-        #new_dists = 1/new_dists
-        #TODO does this represnt the right formula?
-        return np.min(new_dists,axis=1)
-
     #collect the gradient information for all images
     #last layer gradients from coresets for data efficient training (logits - onehot_label)
     #TODO possibly wrong here
@@ -273,11 +288,13 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     #avalible = np.array([x for x in range(ds_size)]) #all indexes avalible
     curr = conn.cursor()
     curr.execute('''SELECT id FROM imgs''')
-    avalible = np.array([int(x[0]) for x in curr.fetchall()])
+    global avalible = np.array([int(x[0]) for x in curr.fetchall()])
     print(len(avalible),'are avalible to select at start of process')
 
     batch_indexes = np.zeros((k,batch_size),dtype=int) -1 # [[batch0],[batch1],...,*k] init to -1
 
+    
+    pool = Pool()
     #TODO might be possible to parralize this creating each batch simultaniouly
     for b in range(batch_size): #each item goes into one batch at a time
         for batch_num in range(k):
@@ -291,24 +308,10 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
                 choice = int(random.choice(avalible))
             else:
                 #calculate inner and outer diversity for all the possible new samples
-                item_scores = []
-                #TODO parralize the below
-                for i,grads in enumerate(aprox_grads): 
-                    if i in avalible:
-                        #calc score for each sample
-                        #TODO change the function inputs to match
-                        inner_div_score = calc_inner_diversity(batch_indexes,batch_num,i,aprox_grads)
-                        outer_div_score = calc_outer_diversity(batch_indexes,i,aprox_grads,batch_num,k)
-                        #print(inner_div_score)
-                        #print(outer_div_score)
-                        #TODO add normalization
-                        #combine the scores based on the parameters alpha and beta
-                        score = alpha * inner_div_score + beta * outer_div_score
-                        item_scores = np.concatenate((item_scores,score),axis=0)
-                    #else:
-                        #cant use this point but used to hold indexing position
-                    #    item_scores.append(-1) #TODO check this dosent break anything
-                #print(item_scores)
+                
+                item_scores = pool.map(calc_scores, enumerate(aprox_grads))
+                #remove scores of -1 as these are already used
+                item_scores.remove(-1)
                 #pick greedly the best index and add it to the current batch
                 choice = np.argmax(item_scores) #choice is the index in avalible
                 

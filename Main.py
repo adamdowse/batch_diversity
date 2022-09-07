@@ -25,8 +25,8 @@ def test_step(imgs, labels):
 config= {
     'db_path' : "db/",
     'ds_name' : "mnist",
-    'train_percent' : 0.1,
-    'test_percent' : 0.1,
+    'train_percent' : 0.01,
+    'test_percent' : 0.01,
     'group' : 'testing',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.01,
