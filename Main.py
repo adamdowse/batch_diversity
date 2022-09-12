@@ -1,6 +1,7 @@
 import supporting_functions as sf
 import tensorflow as tf
 import wandb
+import numpy as np
 
 @tf.function
 def train_step(imgs,labels):
@@ -30,11 +31,12 @@ config= {
     'group' : 'testing',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.01,
+    'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 2000,
-    'k' : 50,
-    'alpha' : 1,
-    'beta' : 1,
+    'max_its' : 5000,
+    'k' : 1,
+    'des_inner' : 0.9,
+    'des_outer' : 1,
     'random_db' : 'False',
     }
 
@@ -71,26 +73,47 @@ if __name__ == "__main__":
     train_it = 0
     test_it = 0 
     test_cap = 20
+
+    images_used = np.zeros(num_train_imgs)
+
     while train_it < config['max_its']:
+
+        print("Train it: ",train_it)
+
+        if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
+            i_scores,idx,i_des_descrep = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
+
         for i, (X,Y) in enumerate(train_data_gen):
             #do k iterations on batches (first round is at least 1 full epoch run)
             #train function
             train_step(X[1],Y)
-
             train_it += 1
         
+        #calc stats
+        if train_it > (config['warm_start'] * train_data_gen.ret_batch_info()):
+            wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                        'train_loss':train_loss.result().numpy(),
+                        'total_inner_a_div':np.mean(i_scores),
+                        'total_inner_std_div':np.std(i_scores),
+                        'chosen_inner_div':i_scores[idx],
+                        'inner_des_diff':i_des_descrep},step=train_it)
+        else:
+            wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                        'train_loss':train_loss.result().numpy()},step=train_it)
+
+
         train_data_gen.on_epoch_end()
-        sf.k_diversity(model,train_ds,config['k'],config['batch_size'],config['alpha'],config['beta'],num_classes,conn)
+
         test_it += 1
-
-        wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                    'train_loss':train_loss.result().numpy()},step=train_it)
-
         if test_it > test_cap:
-            for X,Y in test_ds:
-                test_step(X[1],Y)
+            for X,Y in test_ds.batch(100):
+                Y = tf.one_hot(Y,num_classes)
+                test_step(X,Y)
             test_it = 0
 
             wandb.log({'test_acc':test_acc_metric.result().numpy(),
                     'test_loss':test_loss.result().numpy()},step=train_it)
+    
+    #final logging
+    wandb.log({'images_used':images_used})
         

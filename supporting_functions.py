@@ -36,13 +36,13 @@ class CustomDBDataGen(tf.keras.utils.Sequence):
 
         #randomly batch for first warm start
         if num_images / batch_size == 0:
-            num_batches = int(num_images/batch_size)
+            self.num_batches = int(num_images/batch_size)
         else:
-            num_batches = 1 + int(num_images/batch_size)
+            self.num_batches = 1 + int(num_images/batch_size)
 
-        print('There are ',num_batches,' batches in the warm start')
+        print('There are ',self.num_batches,' batches in the warm start')
         arr = []
-        for n in range(num_batches):
+        for n in range(self.num_batches):
             to_add = [n]*batch_size
             arr = arr + to_add
         
@@ -54,6 +54,9 @@ class CustomDBDataGen(tf.keras.utils.Sequence):
         for i, a in enumerate(arr):
             curr.execute('''UPDATE imgs SET batch_num = (?) WHERE id = (?)''',(int(a),int(i),))
         conn.commit()
+    
+    def ret_batch_info(self):
+        return self.num_batches
 
     def on_epoch_end(self):
         #reset the batch numbers to -1 for all images
@@ -214,14 +217,13 @@ def setup_model(config,num_classes,img_shape):
     test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_acc_metric = keras.metrics.CategoricalAccuracy()
     return model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric
-
+'''
 def calc_inner_diversity(indexes,batch_num,i,grads):
-    '''
+    ''
     current_indexes = list of indexes in this batch [indexes]
     i = the item index that we are scoring
     grads = the list of aproximate gradients for this index [...]
-    '''
-    
+    ''
     #if length is 0?TODO
     #calculate the euclidean distance between the last layer gradients
     #we want this to be minimal
@@ -231,6 +233,7 @@ def calc_inner_diversity(indexes,batch_num,i,grads):
     return np.min(new_dists,axis=1)
 
 def calc_outer_diversity(indexes,i,grads,batch_num,k):
+    #we want the new batch to be 
     #calc the distance between the modified batch with the item included to the other batches
     #the score is 1/ the distance 
     
@@ -254,27 +257,20 @@ def calc_outer_diversity(indexes,i,grads,batch_num,k):
     #TODO does this represnt the right formula?
     return np.min(new_dists,axis=1)
 
-def calc_scores(x):
-    [i,grads] = x
-
-    if i in avalible:
-        #calc score for each sample
-        inner_div_score = calc_inner_diversity(batch_indexes,batch_num,i,aprox_grads)
-        outer_div_score = calc_outer_diversity(batch_indexes,i,aprox_grads,batch_num,k)
-        #TODO add normalization
-        #combine the scores based on the parameters alpha and beta
-        score = alpha * inner_div_score + beta * outer_div_score
-        return score
-        #item_scores = np.concatenate((item_scores,score),axis=0)
-    else:
-        return -1
+def calc_scores(aid,batch_indexes,batch_num,approx_grads,k):
+    #calc score for each sample
+    inner_div_score = calc_inner_diversity(batch_indexes,batch_num,aid,aprox_grads)
+    outer_div_score = calc_outer_diversity(batch_indexes,aid,aprox_grads,batch_num,k)
+    #TODO add normalization
+    #combine the scores based on the parameters alpha and beta
+    score = alpha * inner_div_score + beta * outer_div_score
+    return score
 
 def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     #collect the gradient information for all images
     #last layer gradients from coresets for data efficient training (logits - onehot_label)
     #TODO possibly wrong here
     intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    #TODO make this batched for speed
     for i, (img,label) in enumerate(train_ds.batch(100)):
         logits = intermediate_layer_model.predict(img)
         onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
@@ -284,18 +280,29 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
         else:
             aprox_grads= np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
 
+    for i, (img,label) in enumerate(train_ds.batch(100)):
+        softmax = model.predict(img)
+        print("softmax",softmax)
+        pnt()
+        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
+        entropy = np.sum(np.array(softmax) - onehot)
+        if i == 0:
+            e = entropy
+        else:
+            e = np.concatenate((e,entropy),axis=0) # list of the grads [entropy,entorpy]
+
+            
     #run the submod evaluation
     #avalible = np.array([x for x in range(ds_size)]) #all indexes avalible
     curr = conn.cursor()
-    curr.execute('''SELECT id FROM imgs''')
-    global avalible = np.array([int(x[0]) for x in curr.fetchall()])
+    curr.execute(''SELECT id FROM imgs'')
+    avalible = np.array([int(x[0]) for x in curr.fetchall()]) # 1 to n for db ids
     print(len(avalible),'are avalible to select at start of process')
 
     batch_indexes = np.zeros((k,batch_size),dtype=int) -1 # [[batch0],[batch1],...,*k] init to -1
 
     
     pool = Pool()
-    #TODO might be possible to parralize this creating each batch simultaniouly
     for b in range(batch_size): #each item goes into one batch at a time
         for batch_num in range(k):
             #calc inner batch distance
@@ -308,19 +315,69 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
                 choice = int(random.choice(avalible))
             else:
                 #calculate inner and outer diversity for all the possible new samples
-                
-                item_scores = pool.map(calc_scores, enumerate(aprox_grads))
-                #remove scores of -1 as these are already used
-                item_scores.remove(-1)
+                #build the list that is used in the map
+                pool_input = [(aid,batch_indexes,batch_num,approx_grads,k) for aid in avalible]
+                item_scores = pool.starmap(calc_scores, pool_input)
                 #pick greedly the best index and add it to the current batch
-                choice = np.argmax(item_scores) #choice is the index in avalible
+                choice = avalible[np.argmax(item_scores)]#choice is the db id
                 
             #set the db values to the batch numbers of the images for each upcoming batch
-            batch_indexes[batch_num][b] = avalible[choice]  #avalible[choice] is the og index
-            curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(batch_num),int(avalible[choice]),))
-            avalible = np.delete(avalible,choice)
+            batch_indexes[batch_num][b] = choice 
+            curr.execute('' UPDATE imgs SET batch_num = (?) WHERE id = (?) '',(int(batch_num),int(choice),))
+            avalible = np.delete(avalible,avalible==choice)
             print(batch_indexes)
 
     #Should end up with a list of lists of indexes of batches here
     conn.commit()
-   
+'''
+
+def calc_inner_diversity(grads):
+    #calculate the euclidean distance between the last layer gradients
+    #TODO account for k
+    dists = cdist(grads,grads,metric='euclidean')
+    return np.sum(np.sum(dists)) / len(dists)
+
+
+def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
+    #calculate the approximate grads from model for all data
+    print("----Building aprox grads")
+    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
+    for i, (img,label) in enumerate(train_ds.batch(100)):
+        logits = intermediate_layer_model.predict(img,verbose=0)
+        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
+        grads = np.array(logits) - onehot
+        if i == 0:
+            aprox_grads = grads
+        else:
+            aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
+
+    #create a large number of random number sequences (Possible to do repeates here but unlikely)
+    print("----Scoring sequences")
+    total_seq = 10000
+    sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,k*batch_size)) #lists of random indexes of the grads
+
+    #score each sequence based on inner and outer diversity
+    pool = Pool()
+    pool_input = [(aprox_grads[s],) for s in sequences]
+    i_scores = pool.starmap(calc_inner_diversity,pool_input) #shape of sequences
+
+    #normalise to 0 and 1
+    print("----Updating db")
+    n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
+
+    #choose sequence closes to desired inputs and set the sequence in the db
+    s_idx = (np.abs(n_i_scores - des_inner)).argmin()
+    i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
+    sequence = sequences[s_idx]
+    curr = conn.cursor()
+    b_num = 0
+    for i,idx in enumerate(sequence):
+        if i != 0:
+            b_num = i // batch_size
+        images_used[idx] += 1
+        curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
+    conn.commit()
+
+    return i_scores, idx, i_des_descrep
+    
+
