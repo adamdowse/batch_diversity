@@ -32,13 +32,13 @@ config= {
     'learning_rate' : 0.01,
     'batch_size' : 32,
     'max_its' : 2000,
-    'k' : 5,
+    'k' : 50,
     'alpha' : 1,
     'beta' : 1,
     'random_db' : 'False',
     }
 
-disabled = True
+disabled = False
 
 if __name__ == "__main__":
     #Setup
