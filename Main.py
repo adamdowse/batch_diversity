@@ -4,6 +4,7 @@ import tensorflow_addons as tfa
 import wandb
 import numpy as np
 import sklearn
+import matplotlib.pyplot as plt
 
 
 @tf.function
@@ -36,7 +37,7 @@ config= {
     'learning_rate' : 0.01,
     'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 200,
+    'max_its' : 50,
     'k' : 1,
     'des_inner' : 0.1,
     'des_outer' : 1,
@@ -54,6 +55,7 @@ if __name__ == "__main__":
     img_size = ds_info.features['image'].shape
     num_train_imgs = ds_info.splits['train[:'+str(int(config['train_percent']*100))+'%]'].num_examples
     num_test_imgs = ds_info.splits['test[:'+str(int(config['test_percent']*100))+'%]'].num_examples
+
     print('# Classes=',num_classes)
     print('Class Names=',class_names)
     print('Img size=',img_size)
@@ -119,14 +121,26 @@ if __name__ == "__main__":
             wandb.log({'test_acc':test_acc_metric.result().numpy(),
                     'test_loss':test_loss.result().numpy()},step=train_it)
     #finished training
-    pred = []
-    t = []
-    for X,Y in test_ds:
-        pred.append(model.predict(X).argmax())
-        t.append(Y)
-    wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,y_true=t,preds=preds,class_names=class_names)})
-
-
     #final logging
-    wandb.log({'images_used':wandb.Histogram(images_used)})
+    cm = np.zeros((num_classes,num_classes))
+    for X,Y in test_ds.batch(1):
+        cm[model.predict(X).argmax(),Y] += 1
+
+    fig,ax = plt.subplots()
+    im = ax.imshow(cm)
+    ax.set_xticks(np.arange(num_classes), labels=class_names)
+    ax.set_yticks(np.arange(num_classes), labels=class_names)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",rotation_mode="anchor")
+    for i in range(num_classes):
+        for j in range(num_classes):
+            text = ax.text(j, i, int(cm[i, j]), ha="center", va="center", color="w")
+    ax.set_title("CM")
+    fig.tight_layout()
+    wandb.log({"conf_mat": fig})
+
+    fig1,ax1 = plt.subplots()
+    im1 = ax1.hist(images_used)
+    fig1.tight_layout()
+
+    wandb.log({'images_used':wandb.Image(fig1)})
         
