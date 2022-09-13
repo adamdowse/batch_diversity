@@ -1,7 +1,10 @@
 import supporting_functions as sf
 import tensorflow as tf
+import tensorflow_addons as tfa
 import wandb
 import numpy as np
+import sklearn
+
 
 @tf.function
 def train_step(imgs,labels):
@@ -28,16 +31,16 @@ config= {
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
-    'group' : 'testing',
+    'group' : 'i_score_results',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.01,
     'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 5000,
+    'max_its' : 200,
     'k' : 1,
-    'des_inner' : 0.9,
+    'des_inner' : 0.1,
     'des_outer' : 1,
-    'random_db' : 'False',
+    'random_db' : 'True',
     }
 
 disabled = False
@@ -81,7 +84,7 @@ if __name__ == "__main__":
         print("Train it: ",train_it)
 
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
-            i_scores,idx,i_des_descrep = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
+            i_scores,idx,i_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
 
         for i, (X,Y) in enumerate(train_data_gen):
             #do k iterations on batches (first round is at least 1 full epoch run)
@@ -93,10 +96,12 @@ if __name__ == "__main__":
         if train_it > (config['warm_start'] * train_data_gen.ret_batch_info()):
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy(),
-                        'total_inner_a_div':np.mean(i_scores),
-                        'total_inner_std_div':np.std(i_scores),
-                        'chosen_inner_div':i_scores[idx],
-                        'inner_des_diff':i_des_descrep},step=train_it)
+                        'mean_i_scores':np.mean(i_scores),
+                        'std_i_scores':np.std(i_scores),
+                        'chosen_i_score':i_scores[idx],
+                        'inner_des_diff':i_des_descrep,
+                        'all_i_scores_90':np.percentile(i_scores,90),
+                        'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
         else:
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy()},step=train_it)
@@ -113,7 +118,15 @@ if __name__ == "__main__":
 
             wandb.log({'test_acc':test_acc_metric.result().numpy(),
                     'test_loss':test_loss.result().numpy()},step=train_it)
-    
+    #finished training
+    pred = []
+    t = []
+    for X,Y in test_ds:
+        pred.append(model.predict(X).argmax())
+        t.append(Y)
+    wandb.log({"conf_mat": wandb.plot.confusion_matrix(probs=None,y_true=t,preds=preds,class_names=class_names)})
+
+
     #final logging
-    wandb.log({'images_used':images_used})
+    wandb.log({'images_used':wandb.Histogram(images_used)})
         

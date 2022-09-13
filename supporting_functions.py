@@ -378,6 +378,6 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
         curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
     conn.commit()
 
-    return i_scores, idx, i_des_descrep
+    return i_scores, s_idx, i_des_descrep, n_i_scores
     
 
