@@ -28,18 +28,18 @@ def test_step(imgs, labels):
     return
 
 config= {
-    'db_path' : "db/",
+    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
     'ds_name' : "mnist",
-    'train_percent' : 0.01,
-    'test_percent' : 0.01,
+    'train_percent' : 0.1,
+    'test_percent' : 0.1,
     'group' : 'i_score_results',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.01,
     'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 50,
+    'max_its' : 5000,
     'k' : 1,
-    'des_inner' : 0.1,
+    'des_inner' : 1,
     'des_outer' : 1,
     'random_db' : 'True',
     }

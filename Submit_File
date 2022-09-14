@@ -1,0 +1,22 @@
+universe = docker
+docker_image = registry.eps.surrey.ac.uk/adamsdocker:38355
+
+executable = /usr/bin/python3
+arguments = $ENV(PWD)/Main.py 
+
+should_transfer_files = NO
+environment = "mount=$ENV(PWD),/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs"
+
+log = $ENV(PWD)/condor/c$(cluster).p$(process).log
+output = $ENV(PWD)/condor/c$(cluster).p$(process).out
+error = $ENV(PWD)/condor/c$(cluster).p$(process).error
+
++CanCheckpoint = False
++JobRunTime = 5
+
+request_GPUs = 1
++GPUMem = 8000
+request_CPUs = 4
+request_memory = 8000
+
+queue 10
