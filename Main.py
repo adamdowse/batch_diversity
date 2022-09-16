@@ -5,6 +5,7 @@ import wandb
 import numpy as np
 import sklearn
 import matplotlib.pyplot as plt
+import time
 
 
 @tf.function
@@ -26,20 +27,20 @@ def test_step(imgs, labels):
     test_loss(m_loss)
     test_acc_metric(labels, preds)
     return
-
+#/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
 config= {
-    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+    'db_path' : "DBs/",
     'ds_name' : "mnist",
-    'train_percent' : 0.1,
-    'test_percent' : 0.1,
+    'train_percent' : 0.01,
+    'test_percent' : 0.01,
     'group' : 'i_score_results',
     'model_name' : 'Simple_CNN',
-    'learning_rate' : 0.01,
+    'learning_rate' : 0.001,
     'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 5000,
+    'max_its' : 1000,
     'k' : 1,
-    'des_inner' : 1,
+    'des_inner' : 0,
     'des_outer' : 1,
     'random_db' : 'True',
     }
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     while train_it < config['max_its']:
 
         print("Train it: ",train_it)
-
+        t = time.time()
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
             i_scores,idx,i_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
 
@@ -120,6 +121,7 @@ if __name__ == "__main__":
 
             wandb.log({'test_acc':test_acc_metric.result().numpy(),
                     'test_loss':test_loss.result().numpy()},step=train_it)
+        print(time.time() - t)
     #finished training
     #final logging
     cm = np.zeros((num_classes,num_classes))

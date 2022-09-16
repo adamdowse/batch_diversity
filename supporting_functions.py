@@ -335,12 +335,13 @@ def calc_inner_diversity(grads):
     #calculate the euclidean distance between the last layer gradients
     #TODO account for k
     dists = cdist(grads,grads,metric='euclidean')
+    #TODO pretty sure below should be div len^2
     return np.sum(np.sum(dists)) / len(dists)
 
 
 def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
     #calculate the approximate grads from model for all data
-    print("----Building aprox grads")
+    #print("----Building aprox grads")
     intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
     for i, (img,label) in enumerate(train_ds.batch(100)):
         logits = intermediate_layer_model.predict(img,verbose=0)
@@ -352,7 +353,7 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
             aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
 
     #create a large number of random number sequences (Possible to do repeates here but unlikely)
-    print("----Scoring sequences")
+    #print("----Scoring sequences")
     total_seq = 10000
     sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,k*batch_size)) #lists of random indexes of the grads
 
@@ -362,7 +363,7 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
     i_scores = pool.starmap(calc_inner_diversity,pool_input) #shape of sequences
 
     #normalise to 0 and 1
-    print("----Updating db")
+    #print("----Updating db")
     n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
 
     #choose sequence closes to desired inputs and set the sequence in the db
