@@ -1,15 +1,8 @@
-from multiprocessing import Pool
+import numpy as np
+a = np.array([1,2,3,4,5,6,7])
 
-y = 0
+b = [1,1,2,3,3,3,3]
 
-def f(x):
-    print(x)
-    print(y)
-    return (x[0] * x[0]) +x[1]
+c = a[b]
 
-
-if __name__ == "__main__":
-    pool = Pool()
-    x = pool.apply_async(f,enumerate([1,2,3,2,1,6,5]))
-
-    print(x)
+print(c)

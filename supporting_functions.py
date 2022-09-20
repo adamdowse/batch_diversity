@@ -1,4 +1,5 @@
 #collection of helpper functions
+from typing import no_type_check_decorator
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow import keras
@@ -331,12 +332,34 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     conn.commit()
 '''
 
-def calc_inner_diversity(grads):
-    #calculate the euclidean distance between the last layer gradients
-    #TODO account for k
-    dists = cdist(grads,grads,metric='euclidean')
-    #TODO pretty sure below should be div len^2
-    return np.sum(np.sum(dists)) / len(dists)
+def calc_scores(grads,k):
+    def calc_inner_diversity(grads,k):
+        bs = len(grads)/k
+        batch_scores = np.zeros(k)
+        #calculate the euclidean distance between the last layer gradients
+        for i in range(k):
+            dists = cdist(grads[int(i*bs):int(((i+1)*bs)-1)],grads[int(i*bs):int(((i+1)*bs)-1)],metric='euclidean')
+            batch_scores[i] = np.sum(np.sum(dists)) / len(dists)**2
+        return np.mean(batch_scores)
+    
+    def calc_outer_diversity(grads,k):
+        bs = len(grads)/k
+        #take the mean of each batches gradients
+        for i in range(k):
+            if i == 0:
+                mean_grads = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
+            else:
+                mean_grad = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
+                mean_grads = np.concatenate((mean_grads,mean_grad),axis=0)
+        
+        #calc the distance between the means
+        dists = cdist(mean_grads,mean_grads,metric='euclidean')
+        return np.sum(np.sum(dists)) / k**2
+
+    i_score = calc_inner_diversity(grads,k)
+    o_score = calc_outer_diversity(grads,k)
+
+    return (i_score,o_score)
 
 
 def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
@@ -354,21 +377,26 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
 
     #create a large number of random number sequences (Possible to do repeates here but unlikely)
     #print("----Scoring sequences")
-    total_seq = 10000
+    total_seq = 100000
     sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,k*batch_size)) #lists of random indexes of the grads
 
     #score each sequence based on inner and outer diversity
     pool = Pool()
-    pool_input = [(aprox_grads[s],) for s in sequences]
-    i_scores = pool.starmap(calc_inner_diversity,pool_input) #shape of sequences
+    pool_input = [(aprox_grads[s],k,) for s in sequences]
+    scores = pool.starmap(calc_scores,pool_input) #shape of sequences
+
+    i_scores = [s[0] for s in scores]
+    o_scores = [s[1] for s in scores]
 
     #normalise to 0 and 1
     #print("----Updating db")
     n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
+    n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
 
     #choose sequence closes to desired inputs and set the sequence in the db
-    s_idx = (np.abs(n_i_scores - des_inner)).argmin()
+    s_idx = (np.abs(n_i_scores - des_inner)+np.abs(n_o_scores - des_outer)).argmin()
     i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
+    o_des_descrep = (np.abs(n_o_scores - des_outer)).min()
     sequence = sequences[s_idx]
     curr = conn.cursor()
     b_num = 0
@@ -379,6 +407,6 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
         curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
     conn.commit()
 
-    return i_scores, s_idx, i_des_descrep, n_i_scores
+    return i_scores,o_scores, s_idx, i_des_descrep, o_des_descrep, n_i_scores
     
 

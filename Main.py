@@ -33,14 +33,14 @@ config= {
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
-    'group' : 'i_score_results',
+    'group' : 'i_o_results',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.001,
     'warm_start' : 1,
     'batch_size' : 32,
     'max_its' : 1000,
-    'k' : 1,
-    'des_inner' : 0,
+    'k' : 2,
+    'des_inner' : 1,
     'des_outer' : 1,
     'random_db' : 'True',
     }
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         print("Train it: ",train_it)
         t = time.time()
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
-            i_scores,idx,i_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
+            i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
 
         for i, (X,Y) in enumerate(train_data_gen):
             #do k iterations on batches (first round is at least 1 full epoch run)
@@ -100,11 +100,15 @@ if __name__ == "__main__":
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy(),
                         'mean_i_scores':np.mean(i_scores),
-                        'std_i_scores':np.std(i_scores),
+                        'mean_o_scores':np.mean(o_scores),
                         'chosen_i_score':i_scores[idx],
+                        'chosen_o_score':o_scores[idx],
                         'inner_des_diff':i_des_descrep,
+                        'outer_des_diff':o_des_descrep,
                         'all_i_scores_90':np.percentile(i_scores,90),
-                        'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
+                        'all_i_scores_10':np.percentile(i_scores,10),
+                        'all_o_scores_90':np.percentile(o_scores,90),
+                        'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
         else:
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy()},step=train_it)
