@@ -332,29 +332,25 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     conn.commit()
 '''
 
-def calc_scores(grads,k):
-    
+def calc_inner_scores(grads,k):
     bs = len(grads)/k
     batch_scores = np.zeros(k)
     #calculate the euclidean distance between the last layer gradients
     for i in range(k):
         dists = cdist(grads[int(i*bs):int(((i+1)*bs)-1)],grads[int(i*bs):int(((i+1)*bs)-1)],metric='euclidean')
         batch_scores[i] = np.sum(np.sum(dists)) / len(dists)**2
-    i_score = np.mean(batch_scores)
-    
+    return np.mean(batch_scores)
 
+def calc_outer_scores(grads,k):
+    bs = len(grads)/k
     #take the mean of each batches gradients
+    mean_grads = np.zeros((k,len(grads[0])))
     for i in range(k):
-        if i == 0:
-            mean_grads = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
-        else:
-            mean_grad = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
-            mean_grads = np.concatenate((mean_grads,mean_grad),axis=0)
-    
+        mean_grads[i] = np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)
+
     #calc the distance between the means
     dists = cdist(mean_grads,mean_grads,metric='euclidean')
-    o_score = np.sum(np.sum(dists)) / k**2
-    return (i_score,o_score,)
+    return np.sum(np.sum(dists)) / k**2
 
 
 def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
@@ -376,12 +372,13 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
     sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,k*batch_size)) #lists of random indexes of the grads
 
     #score each sequence based on inner and outer diversity
-    pool = Pool()
+    pool = Pool(processes=10,maxtasksperchild=10)
     pool_input = [(aprox_grads[s],k,) for s in sequences]
-    scores = pool.starmap(calc_scores,pool_input) #shape of sequences
-
-    i_scores = [s[0] for s in scores]
-    o_scores = [s[1] for s in scores]
+    i_scores = pool.starmap(calc_inner_scores,pool_input) #shape of sequences
+    pool.close()
+    pool = Pool(processes=10,maxtasksperchild=10)
+    o_scores = pool.starmap(calc_outer_scores,pool_input)
+    pool.close()
 
     #normalise to 0 and 1
     #print("----Updating db")
