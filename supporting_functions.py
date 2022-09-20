@@ -333,33 +333,28 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
 '''
 
 def calc_scores(grads,k):
-    def calc_inner_diversity(grads,k):
-        bs = len(grads)/k
-        batch_scores = np.zeros(k)
-        #calculate the euclidean distance between the last layer gradients
-        for i in range(k):
-            dists = cdist(grads[int(i*bs):int(((i+1)*bs)-1)],grads[int(i*bs):int(((i+1)*bs)-1)],metric='euclidean')
-            batch_scores[i] = np.sum(np.sum(dists)) / len(dists)**2
-        return np.mean(batch_scores)
     
-    def calc_outer_diversity(grads,k):
-        bs = len(grads)/k
-        #take the mean of each batches gradients
-        for i in range(k):
-            if i == 0:
-                mean_grads = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
-            else:
-                mean_grad = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
-                mean_grads = np.concatenate((mean_grads,mean_grad),axis=0)
-        
-        #calc the distance between the means
-        dists = cdist(mean_grads,mean_grads,metric='euclidean')
-        return np.sum(np.sum(dists)) / k**2
+    bs = len(grads)/k
+    batch_scores = np.zeros(k)
+    #calculate the euclidean distance between the last layer gradients
+    for i in range(k):
+        dists = cdist(grads[int(i*bs):int(((i+1)*bs)-1)],grads[int(i*bs):int(((i+1)*bs)-1)],metric='euclidean')
+        batch_scores[i] = np.sum(np.sum(dists)) / len(dists)**2
+    i_score = np.mean(batch_scores)
+    
 
-    i_score = calc_inner_diversity(grads,k)
-    o_score = calc_outer_diversity(grads,k)
-
-    return (i_score,o_score)
+    #take the mean of each batches gradients
+    for i in range(k):
+        if i == 0:
+            mean_grads = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
+        else:
+            mean_grad = [np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)]
+            mean_grads = np.concatenate((mean_grads,mean_grad),axis=0)
+    
+    #calc the distance between the means
+    dists = cdist(mean_grads,mean_grads,metric='euclidean')
+    o_score = np.sum(np.sum(dists)) / k**2
+    return (i_score,o_score,)
 
 
 def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
