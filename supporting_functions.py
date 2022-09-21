@@ -1,4 +1,6 @@
 #collection of helpper functions
+import multiprocessing
+from multiprocessing import Pool
 from typing import no_type_check_decorator
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -11,11 +13,12 @@ import numpy as np
 import random
 import io
 import os
+from os import getpid
 import wandb
 import supporting_models as sm
 import scipy
 from scipy.spatial.distance import cdist
-from multiprocessing import Pool
+
 
 
 
@@ -332,25 +335,20 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     conn.commit()
 '''
 
-def calc_inner_scores(grads,k):
+def calc_scores(grads,k):
+
     bs = len(grads)/k
     batch_scores = np.zeros(k)
+    mean_grads = np.zeros((k,len(grads[0])))
     #calculate the euclidean distance between the last layer gradients
     for i in range(k):
         dists = cdist(grads[int(i*bs):int(((i+1)*bs)-1)],grads[int(i*bs):int(((i+1)*bs)-1)],metric='euclidean')
         batch_scores[i] = np.sum(np.sum(dists)) / len(dists)**2
-    return np.mean(batch_scores)
-
-def calc_outer_scores(grads,k):
-    bs = len(grads)/k
-    #take the mean of each batches gradients
-    mean_grads = np.zeros((k,len(grads[0])))
-    for i in range(k):
         mean_grads[i] = np.mean(grads[int(i*bs):int(((i+1)*bs)-1)],axis=0)
 
     #calc the distance between the means
     dists = cdist(mean_grads,mean_grads,metric='euclidean')
-    return np.sum(np.sum(dists)) / k**2
+    return (np.mean(batch_scores) , np.sum(np.sum(dists)) / k**2,)
 
 
 def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used):
@@ -365,6 +363,12 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
             aprox_grads = grads
         else:
             aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
+    #c =0
+    #for i,d in enumerate(train_ds):
+    #    c += 1
+
+    #aprox_grads = np.random.randint(1,10000,size=(c,10))
+
 
     #create a large number of random number sequences (Possible to do repeates here but unlikely)
     #print("----Scoring sequences")
@@ -372,14 +376,13 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
     sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,k*batch_size)) #lists of random indexes of the grads
 
     #score each sequence based on inner and outer diversity
-    pool = Pool(processes=10,maxtasksperchild=10)
-    pool_input = [(aprox_grads[s],k,) for s in sequences]
-    i_scores = pool.starmap(calc_inner_scores,pool_input) #shape of sequences
-    pool.close()
-    pool = Pool(processes=10,maxtasksperchild=10)
-    o_scores = pool.starmap(calc_outer_scores,pool_input)
-    pool.close()
-
+    
+    with Pool(maxtasksperchild=50) as pool:
+        pool_input = [(aprox_grads[s],k,) for s in sequences]
+        scores = pool.starmap(calc_scores,pool_input,chunksize=50,) #shape of sequences
+    
+    i_scores = [s[0] for s in scores]
+    o_scores = [s[1] for s in scores]
     #normalise to 0 and 1
     #print("----Updating db")
     n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))

@@ -1,11 +1,12 @@
 import supporting_functions as sf
 import tensorflow as tf
-import tensorflow_addons as tfa
+#import tensorflow_addons as tfa
 import wandb
 import numpy as np
-import sklearn
+#import sklearn
 import matplotlib.pyplot as plt
-import time
+#import time
+#import tracemalloc
 
 
 @tf.function
@@ -81,11 +82,11 @@ if __name__ == "__main__":
     test_cap = 20
 
     images_used = np.zeros(num_train_imgs)
-
+    #tracemalloc.start()
+    
     while train_it < config['max_its']:
-
-        print("Train it: ",train_it)
-        t = time.time()
+            #start_snapshot=tracemalloc.take_snapshot()
+        print("Itt",train_it)
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
             i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
             train_step(X[1],Y)
             train_it += 1
         
-        #calc stats
+        #calc stats and logging
         if train_it > (config['warm_start'] * train_data_gen.ret_batch_info()):
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy(),
@@ -113,10 +114,9 @@ if __name__ == "__main__":
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy()},step=train_it)
 
-
+        #reset the batch numbers to 0
         train_data_gen.on_epoch_end()
 
-        test_it += 1
         if test_it > test_cap:
             for X,Y in test_ds.batch(100):
                 Y = tf.one_hot(Y,num_classes)
@@ -125,7 +125,9 @@ if __name__ == "__main__":
 
             wandb.log({'test_acc':test_acc_metric.result().numpy(),
                     'test_loss':test_loss.result().numpy()},step=train_it)
-        print(time.time() - t)
+        else:
+            test_it += 1
+
     #finished training
     #final logging
     cm = np.zeros((num_classes,num_classes))
