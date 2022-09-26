@@ -34,15 +34,15 @@ config= {
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
-    'group' : 'i_o_results',
+    'group' : 'itt_sampling_k3',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.001,
     'warm_start' : 1,
     'batch_size' : 32,
     'max_its' : 1000,
-    'k' : 2,
-    'des_inner' : 1,
-    'des_outer' : 1,
+    'k' : 1,
+    'des_inner' : 0,
+    'des_outer' : 0,
     'random_db' : 'True',
     }
 
@@ -82,13 +82,15 @@ if __name__ == "__main__":
     test_cap = 20
 
     images_used = np.zeros(num_train_imgs)
+    mean_saved_gradients = None
     #tracemalloc.start()
     
     while train_it < config['max_its']:
             #start_snapshot=tracemalloc.take_snapshot()
         print("Itt",train_it)
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
-            i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used)
+            i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],
+                num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
 
         for i, (X,Y) in enumerate(train_data_gen):
             #do k iterations on batches (first round is at least 1 full epoch run)
