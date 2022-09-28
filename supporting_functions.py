@@ -497,7 +497,7 @@ def sample_batches_outer_only(model,train_ds,k,batch_size,num_classes,conn,des_o
     #score each sequence based on inner and outer diversity
     with Pool(maxtasksperchild=50) as pool:
         pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
-        o_scores = pool.starmap(calc_scores,pool_input,chunksize=50,) #shape of sequences
+        o_scores = pool.starmap(calc_outer_scores,pool_input,chunksize=50,) #shape of sequences
     
     #normalise to 0 and 1
     n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))

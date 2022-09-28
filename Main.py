@@ -29,8 +29,9 @@ def test_step(imgs, labels):
     test_acc_metric(labels, preds)
     return
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
+#/DBs/
 config= {
-    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+    'db_path' : "DBs/",
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
