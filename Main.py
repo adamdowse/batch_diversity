@@ -30,21 +30,21 @@ def test_step(imgs, labels):
     return
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
 config= {
-    'db_path' : "DBs/",
+    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
-    'group' : 'itt_sampling_k1',
+    'group' : 'o_test',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.001,
     'warm_start' : 1,
     'batch_size' : 32,
-    'max_its' : 1000,
+    'max_its' : 2000,
     'k' : 1,
-    'des_inner' : 1,
-    'des_outer' : 0,
+    'des_inner' : np.random.rand(),
+    'des_outer' : np.random.rand(),
     'random_db' : 'True',
-    'run_type'  : 'i'
+    'run_type'  : 'o'
     }
 
 disabled = False
@@ -91,17 +91,16 @@ if __name__ == "__main__":
         print("Itt",train_it)
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
             if config['run_type'] == 'io':
-                i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],
-                    num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
+                i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
 
             elif config['run_type'] == 'i':
                 i_scores,idx,i_des_descrep,n_i_scores = sf.sample_batches_inner_only(model,train_ds,config["batch_size"],num_classes,conn,config["des_inner"])
-                o_scores = 0
+                o_scores = np.zeros_like(i_scores)
                 o_des_descrep = 0
 
             elif config['run_type'] == 'o':
-                o_scores, s_idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
-                i_scores = 0
+                o_scores, idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
+                i_scores = np.zeros_like(o_scores)
                 i_des_descrep = 0
             else:
                 print("ERROR: Incorrect run type in config.")
@@ -115,18 +114,35 @@ if __name__ == "__main__":
         
         #calc stats and logging
         if train_it > (config['warm_start'] * train_data_gen.ret_batch_info()):
-            wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                        'train_loss':train_loss.result().numpy(),
-                        'mean_i_scores':np.mean(i_scores),
-                        'mean_o_scores':np.mean(o_scores),
-                        'chosen_i_score':i_scores[idx],
-                        'chosen_o_score':o_scores[idx],
-                        'inner_des_diff':i_des_descrep,
-                        'outer_des_diff':o_des_descrep,
-                        'all_i_scores_90':np.percentile(i_scores,90),
-                        'all_i_scores_10':np.percentile(i_scores,10),
-                        'all_o_scores_90':np.percentile(o_scores,90),
-                        'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
+            if config['run_type'] == 'io':
+                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                            'train_loss':train_loss.result().numpy(),
+                            'mean_i_scores':np.mean(i_scores),
+                            'mean_o_scores':np.mean(o_scores),
+                            'chosen_i_score':i_scores[idx],
+                            'chosen_o_score':o_scores[idx],
+                            'inner_des_diff':i_des_descrep,
+                            'outer_des_diff':o_des_descrep,
+                            'all_i_scores_90':np.percentile(i_scores,90),
+                            'all_i_scores_10':np.percentile(i_scores,10),
+                            'all_o_scores_90':np.percentile(o_scores,90),
+                            'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
+            elif config['run_type'] == 'i':
+                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                            'train_loss':train_loss.result().numpy(),
+                            'mean_i_scores':np.mean(i_scores),
+                            'chosen_i_score':i_scores[idx],
+                            'inner_des_diff':i_des_descrep,
+                            'all_i_scores_90':np.percentile(i_scores,90),
+                            'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
+            else:
+                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                            'train_loss':train_loss.result().numpy(),
+                            'mean_o_scores':np.mean(o_scores),
+                            'chosen_o_score':o_scores[idx],
+                            'outer_des_diff':o_des_descrep,
+                            'all_o_scores_90':np.percentile(o_scores,90),
+                            'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
         else:
             wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
                         'train_loss':train_loss.result().numpy()},step=train_it)

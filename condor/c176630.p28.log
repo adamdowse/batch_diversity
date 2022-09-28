@@ -1,0 +1,36 @@
+000 (176630.028.000) 2022-09-28 14:01:18 Job submitted from host: <131.227.81.72:9618?addrs=131.227.81.72-9618&alias=condor.eps.surrey.ac.uk&noUDP&sock=schedd_13380_2544>
+...
+040 (176630.028.000) 2022-09-28 14:01:19 Finished transferring input files
+...
+001 (176630.028.000) 2022-09-28 14:01:20 Job executing on host: <131.227.80.62:9618?addrs=131.227.80.62-9618&alias=dori.eps.surrey.ac.uk&noUDP&sock=startd_3266_c867>
+...
+006 (176630.028.000) 2022-09-28 14:01:29 Image size of job updated: 4500
+	223  -  MemoryUsage of job (MB)
+	228584  -  ResidentSetSize of job (KB)
+...
+006 (176630.028.000) 2022-09-28 14:01:58 Image size of job updated: 4500
+	1918  -  MemoryUsage of job (MB)
+	1964040  -  ResidentSetSize of job (KB)
+...
+040 (176630.028.000) 2022-09-28 14:01:58 Started transferring output files
+...
+040 (176630.028.000) 2022-09-28 14:01:58 Finished transferring output files
+...
+005 (176630.028.000) 2022-09-28 14:01:59 Job terminated.
+	(1) Normal termination (return value 1)
+		Usr 0 00:00:29, Sys 0 00:00:13  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 00:00:29, Sys 0 00:00:13  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	4539  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	4539  -  Total Bytes Sent By Job
+	0  -  Total Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :        0        4         4 
+	   Disk (KB)            :       82     4500    133051 
+	   Gpus (Average)       :                 1         1 "CUDA1"
+	   Memory (MB)          :     1918     8000      8064 
+
+	Job terminated of its own accord at 2022-09-28T13:01:58Z.
+...

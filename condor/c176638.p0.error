@@ -1,0 +1,4 @@
+  File "/user/HS223/ad00878/PhD/batch_diversity/Main.py", line 118
+    if config['run_type'] == 'io':
+                                 ^
+TabError: inconsistent use of tabs and spaces in indentation

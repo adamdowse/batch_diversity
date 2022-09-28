@@ -1,0 +1,33 @@
+2022-09-28 13:19:51.118717: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-09-28 13:19:52.263387: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 10415 MB memory:  -> device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:3b:00.0, compute capability: 6.1
+wandb: Currently logged in as: adamdowse. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.3 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.12.20
+wandb: Run data is saved locally in /scratch/condor/dir_149189/wandb/run-20220928_131953-2n9ysv5t
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run giddy-dream-328
+wandb: ⭐️ View project at https://wandb.ai/adamdowse/k_diversity
+wandb: 🚀 View run at https://wandb.ai/adamdowse/k_diversity/runs/2n9ysv5t
+2022-09-28 13:19:55.330259: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+Traceback (most recent call last):
+  File "/user/HS223/ad00878/PhD/batch_diversity/Main.py", line 103, in <module>
+    o_scores, idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
+  File "/user/HS223/ad00878/PhD/batch_diversity/supporting_functions.py", line 512, in sample_batches_outer_only
+    sequence = sequences[s_idx]
+IndexError: index 104576 is out of bounds for axis 0 with size 100000
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: | 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: / 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:  train_acc ▁
+wandb: train_loss ▁
+wandb: 
+wandb: Run summary:
+wandb:  train_acc 0.46578
+wandb: train_loss 12.43949
+wandb: 
+wandb: Synced giddy-dream-328: https://wandb.ai/adamdowse/k_diversity/runs/2n9ysv5t
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20220928_131953-2n9ysv5t/logs

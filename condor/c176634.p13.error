@@ -1,0 +1,35 @@
+2022-09-28 13:19:50.680101: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-09-28 13:19:51.413728: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 22307 MB memory:  -> device: 0, name: GeForce RTX 3090, pci bus id: 0000:a1:00.0, compute capability: 8.6
+wandb: Currently logged in as: adamdowse. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.3 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.12.20
+wandb: Run data is saved locally in /scratch/condor/dir_10328/wandb/run-20220928_131952-27zgra1k
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run eternal-firefly-318
+wandb: ⭐️ View project at https://wandb.ai/adamdowse/k_diversity
+wandb: 🚀 View run at https://wandb.ai/adamdowse/k_diversity/runs/27zgra1k
+2022-09-28 13:19:54.701793: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+2022-09-28 13:19:56.410434: I tensorflow/stream_executor/cuda/cuda_blas.cc:1786] TensorFloat-32 will be used for the matrix multiplication. This will only be logged once.
+[34m[1mwandb[0m: 429 encountered (Filestream rate limit exceeded, retrying in 2.449777165329497 seconds), retrying request
+Traceback (most recent call last):
+  File "/user/HS223/ad00878/PhD/batch_diversity/Main.py", line 103, in <module>
+    o_scores, idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
+  File "/user/HS223/ad00878/PhD/batch_diversity/supporting_functions.py", line 512, in sample_batches_outer_only
+    sequence = sequences[s_idx]
+IndexError: index 100214 is out of bounds for axis 0 with size 100000
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: | 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:  train_acc ▁
+wandb: train_loss ▁
+wandb: 
+wandb: Run summary:
+wandb:  train_acc 0.38397
+wandb: train_loss 10.47438
+wandb: 
+wandb: Synced eternal-firefly-318: https://wandb.ai/adamdowse/k_diversity/runs/27zgra1k
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20220928_131952-27zgra1k/logs

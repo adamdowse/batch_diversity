@@ -1,0 +1,31 @@
+2022-09-28 13:01:25.356964: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2022-09-28 13:01:26.247289: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1532] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 11423 MB memory:  -> device: 0, name: TITAN Xp, pci bus id: 0000:04:00.0, compute capability: 6.1
+wandb: Currently logged in as: adamdowse. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.3 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.12.20
+wandb: Run data is saved locally in /scratch/condor/dir_15083/wandb/run-20220928_130128-tqnybfpq
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run generous-armadillo-281
+wandb: ⭐️ View project at https://wandb.ai/adamdowse/k_diversity
+wandb: 🚀 View run at https://wandb.ai/adamdowse/k_diversity/runs/tqnybfpq
+2022-09-28 13:01:30.433613: I tensorflow/stream_executor/cuda/cuda_dnn.cc:384] Loaded cuDNN version 8100
+Traceback (most recent call last):
+  File "/user/HS223/ad00878/PhD/batch_diversity/Main.py", line 122, in <module>
+    'chosen_i_score':i_scores[idx],
+NameError: name 'idx' is not defined
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.000 MB of 0.000 MB uploaded (0.000 MB deduped)wandb: \ 0.000 MB of 0.000 MB uploaded (0.000 MB deduped)wandb: | 0.000 MB of 0.000 MB uploaded (0.000 MB deduped)wandb: / 0.000 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.000 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: \ 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: | 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: / 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb: - 0.004 MB of 0.004 MB uploaded (0.000 MB deduped)wandb:                                                                                
+wandb: 
+wandb: Run history:
+wandb:  train_acc ▁
+wandb: train_loss ▁
+wandb: 
+wandb: Run summary:
+wandb:  train_acc 0.77163
+wandb: train_loss 1.52633
+wandb: 
+wandb: Synced generous-armadillo-281: https://wandb.ai/adamdowse/k_diversity/runs/tqnybfpq
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20220928_130128-tqnybfpq/logs

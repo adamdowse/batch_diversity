@@ -1,0 +1,30 @@
+000 (176634.001.000) 2022-09-28 14:19:34 Job submitted from host: <131.227.81.72:9618?addrs=131.227.81.72-9618&alias=condor.eps.surrey.ac.uk&noUDP&sock=schedd_13380_2544>
+...
+040 (176634.001.000) 2022-09-28 14:19:46 Finished transferring input files
+...
+001 (176634.001.000) 2022-09-28 14:19:47 Job executing on host: <131.227.80.29:9618?addrs=131.227.80.29-9618&alias=elenwe.eps.surrey.ac.uk&noUDP&sock=startd_2251_93c6>
+...
+006 (176634.001.000) 2022-09-28 14:19:56 Image size of job updated: 4500
+	14  -  MemoryUsage of job (MB)
+	15200  -  ResidentSetSize of job (KB)
+...
+006 (176634.001.000) 2022-09-28 14:22:44 Image size of job updated: 4500
+	3270  -  MemoryUsage of job (MB)
+	3349448  -  ResidentSetSize of job (KB)
+...
+004 (176634.001.000) 2022-09-28 14:22:46 Job was evicted.
+	(0) CPU times
+		Usr 0 00:03:00, Sys 0 00:01:28  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+	0  -  Run Bytes Sent By Job
+	0  -  Run Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated Assigned
+	   Cpus                 :     0.01        4         4 
+	   Disk (KB)            :    87        4500    133051 
+	   Gpus (Average)       :     0.00        1         1 "CUDA1"
+	   GpusMemory (MB)      : 11936                       
+	   Memory (MB)          :  3270        8000      8064 
+...
+009 (176634.001.000) 2022-09-28 14:22:46 Job was aborted.
+	via condor_rm (by user ad00878)
+...

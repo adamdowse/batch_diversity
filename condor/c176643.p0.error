@@ -1,0 +1,4 @@
+  File "/user/HS223/ad00878/PhD/batch_diversity/Main.py", line 138
+    else config['run_type'] == 'o':
+         ^
+SyntaxError: invalid syntax
