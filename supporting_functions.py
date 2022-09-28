@@ -335,7 +335,19 @@ def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
     conn.commit()
 '''
 
+def calc_inner_scores(grads):
+    return np.sum(np.sum(cdist(grads,grads,metric='euclidean')))
 
+def calc_outer_scores(grads,mean_saved_gradients):
+    if mean_saved_gradients is None:
+        outer_div = 0
+    else:
+        mean_current_grads = np.mean(grads,axis=0)
+        if mean_current_grads.ndim == 1:
+            mean_current_grads = np.expand_dims(mean_current_grads,axis=0)
+        dists = cdist(mean_current_grads,mean_saved_gradients,metric='euclidean')
+        outer_div = np.sum(np.sum(dists)) / mean_saved_gradients.shape[0] ** 2
+    return outer_div
 
 def calc_scores(grads,mean_saved_gradients):
     #calc the inner diversity of the selected grads
@@ -422,4 +434,97 @@ def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_ou
 
     return i_scores,o_scores, s_idx, i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients
     
+def sample_batches_inner_only(model,train_ds,batch_size,num_classes,conn,des_inner):
+    #calculate the approximate grads from model for all data
+    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
+    for i, (img,label) in enumerate(train_ds.batch(100)):
+        logits = intermediate_layer_model.predict(img,verbose=0)
+        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
+        grads = np.array(logits) - onehot
+        if i == 0:
+            aprox_grads = grads
+        else:
+            aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
 
+    #create a large number of random number sequences (Possible to do repeates here but unlikely)
+    total_seq = 100000
+    sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,batch_size)) #lists of random indexes of the grads
+
+    #score each sequence based on inner and outer diversity
+    with Pool(maxtasksperchild=50) as pool:
+        pool_input = [(aprox_grads[s],) for s in sequences]
+        i_scores = pool.starmap(calc_inner_scores,pool_input,chunksize=50,) #shape of sequences
+    
+    #normalise to 0 and 1
+    n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
+
+    #choose sequence closes to desired inputs and set the sequence in the db
+    s_idx = np.abs(n_i_scores - des_inner).argmin()
+
+    #calc the difference between the desired value and the achieved
+    i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
+
+    #the index of data to use
+    sequence = sequences[s_idx]
+    
+    #saving to the database
+    curr = conn.cursor()
+    b_num = 0
+    for i,idx in enumerate(sequence):
+        if i != 0:
+            b_num = i // batch_size
+        curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
+    conn.commit()
+
+    return i_scores, s_idx, i_des_descrep, n_i_scores
+
+def sample_batches_outer_only(model,train_ds,k,batch_size,num_classes,conn,des_outer,mean_saved_gradients):
+    #calculate the approximate grads from model for all data
+    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
+    for i, (img,label) in enumerate(train_ds.batch(100)):
+        logits = intermediate_layer_model.predict(img,verbose=0)
+        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
+        grads = np.array(logits) - onehot
+        if i == 0:
+            aprox_grads = grads
+        else:
+            aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
+
+    #create a large number of random number sequences (Possible to do repeates here but unlikely)
+    total_seq = 100000
+    sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,batch_size)) #lists of random indexes of the grads
+
+    #score each sequence based on inner and outer diversity
+    with Pool(maxtasksperchild=50) as pool:
+        pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
+        o_scores = pool.starmap(calc_scores,pool_input,chunksize=50,) #shape of sequences
+    
+    #normalise to 0 and 1
+    n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
+
+    #choose sequence closes to desired inputs and set the sequence in the db
+    s_idx = (np.abs(n_o_scores - des_outer)).argmin()
+
+    #calc the difference between the desired value and the achieved
+    o_des_descrep = (np.abs(n_o_scores - des_outer)).min()
+
+    #the index of data to use
+    sequence = sequences[s_idx]
+    
+    #calc the mean of the chosen gradients and save
+    if mean_saved_gradients is None:
+        mean_saved_gradients = np.expand_dims(np.mean(aprox_grads[sequence],axis=0),axis=0)
+    else:
+        mean_saved_gradients = array_add(mean_saved_gradients,np.mean(aprox_grads[sequence],axis=0),k)
+
+    
+    #saving to the database
+    curr = conn.cursor()
+    b_num = 0
+    for i,idx in enumerate(sequence):
+        if i != 0:
+            b_num = i // batch_size
+        curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
+    conn.commit()
+
+    return o_scores, s_idx, o_des_descrep, mean_saved_gradients

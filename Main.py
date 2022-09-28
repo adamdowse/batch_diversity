@@ -34,16 +34,17 @@ config= {
     'ds_name' : "mnist",
     'train_percent' : 0.01,
     'test_percent' : 0.01,
-    'group' : 'itt_sampling_k3',
+    'group' : 'itt_sampling_k1',
     'model_name' : 'Simple_CNN',
     'learning_rate' : 0.001,
     'warm_start' : 1,
     'batch_size' : 32,
     'max_its' : 1000,
     'k' : 1,
-    'des_inner' : 0,
+    'des_inner' : 1,
     'des_outer' : 0,
     'random_db' : 'True',
+    'run_type'  : 'i'
     }
 
 disabled = False
@@ -89,9 +90,23 @@ if __name__ == "__main__":
             #start_snapshot=tracemalloc.take_snapshot()
         print("Itt",train_it)
         if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
-            i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],
-                num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
+            if config['run_type'] == 'io':
+                i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],
+                    num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
 
+            elif config['run_type'] == 'i':
+                i_scores,idx,i_des_descrep,n_i_scores = sf.sample_batches_inner_only(model,train_ds,config["batch_size"],num_classes,conn,config["des_inner"])
+                o_scores = 0
+                o_des_descrep = 0
+
+            elif config['run_type'] == 'o':
+                o_scores, s_idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
+                i_scores = 0
+                i_des_descrep = 0
+            else:
+                print("ERROR: Incorrect run type in config.")
+
+                
         for i, (X,Y) in enumerate(train_data_gen):
             #do k iterations on batches (first round is at least 1 full epoch run)
             #train function
