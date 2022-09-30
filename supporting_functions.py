@@ -18,7 +18,7 @@ import wandb
 import supporting_models as sm
 import scipy
 from scipy.spatial.distance import cdist
-
+import time
 
 
 
@@ -27,7 +27,8 @@ class CustomDBDataGen(tf.keras.utils.Sequence):
     def __init__(self, conn,
                  batch_size,
                  num_classes,
-                 num_images
+                 num_images,
+                 warm_start_batches=1
                  ):
         #INIT:
         #randomly batch for the first epoch and update the db
@@ -38,27 +39,31 @@ class CustomDBDataGen(tf.keras.utils.Sequence):
         self.batch_size = batch_size
         self.num_images = num_images
 
-        #randomly batch for first warm start
-        if num_images / batch_size == 0:
-            self.num_batches = int(num_images/batch_size)
-        else:
-            self.num_batches = 1 + int(num_images/batch_size)
+        #dealing with warm starts
+        if warm_start_batches != 0:
+            self.num_batches = warm_start_batches
+            print('There are ',self.num_batches,' batches in the warm start')
 
-        print('There are ',self.num_batches,' batches in the warm start')
-        arr = []
-        for n in range(self.num_batches):
-            to_add = [n]*batch_size
-            arr = arr + to_add
+            arr = []
+            for n in range(self.num_batches):
+                to_add = [n]*batch_size
+                arr = arr + to_add
+            
+            arr = arr[:num_images] #Limit
+            random.shuffle(arr) #shuffle
+
+            #update the database
+            curr = conn.cursor()
+            for i, a in enumerate(arr):
+                curr.execute('''UPDATE imgs SET batch_num = (?) WHERE id = (?)''',(int(a),int(i),))
+            conn.commit()
+        else:   
+            print('There are 0 batches in the warm start')
+            curr = conn.cursor()
+            curr.execute('''UPDATE imgs SET batch_num = -1''')
+            conn.commit()
+
         
-        arr = arr[:num_images] #Limit
-        random.shuffle(arr) #shuffle
-
-        #update the database
-        curr = conn.cursor()
-        for i, a in enumerate(arr):
-            curr.execute('''UPDATE imgs SET batch_num = (?) WHERE id = (?)''',(int(a),int(i),))
-        conn.commit()
-    
     def ret_batch_info(self):
         return self.num_batches
 
@@ -195,7 +200,6 @@ def setup_db(config):
             i += 1
         conn.commit()
 
-    
     return test_ds,train_ds, ds_info, conn
 
 def setup_logs(config,disabled):
@@ -221,119 +225,6 @@ def setup_model(config,num_classes,img_shape):
     test_loss = tf.keras.metrics.Mean(name='test_loss')
     test_acc_metric = keras.metrics.CategoricalAccuracy()
     return model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric
-'''
-def calc_inner_diversity(indexes,batch_num,i,grads):
-    ''
-    current_indexes = list of indexes in this batch [indexes]
-    i = the item index that we are scoring
-    grads = the list of aproximate gradients for this index [...]
-    ''
-    #if length is 0?TODO
-    #calculate the euclidean distance between the last layer gradients
-    #we want this to be minimal
-    current_indexes = indexes[batch_num]
-    current_indexes = current_indexes[current_indexes>=0]
-    new_dists = cdist([grads[i]],grads[current_indexes],metric='euclidean')
-    return np.min(new_dists,axis=1)
-
-def calc_outer_diversity(indexes,i,grads,batch_num,k):
-    #we want the new batch to be 
-    #calc the distance between the modified batch with the item included to the other batches
-    #the score is 1/ the distance 
-    
-    #loop though the other batches
-    for b in range(k):
-        current_indexes = indexes[b]
-        current_indexes = np.array(current_indexes[current_indexes>=0],ndmin=1,dtype=int)
-        if b == batch_num:
-            current_indexes = np.append(current_indexes,i)
-        
-        #find mean of the new batch with added item
-        mean_grads = np.expand_dims(np.mean(grads[current_indexes],axis=0),axis=0)
-        if b == 0:
-            batch_centers = mean_grads
-        else:
-            batch_centers = np.concatenate((batch_centers,mean_grads),axis=0)
-
-    #calc dist between new center and the other centers
-    new_dists = cdist([batch_centers[batch_num]],batch_centers[np.arange(len(batch_centers))!=batch_num])
-    #new_dists = 1/new_dists
-    #TODO does this represnt the right formula?
-    return np.min(new_dists,axis=1)
-
-def calc_scores(aid,batch_indexes,batch_num,approx_grads,k):
-    #calc score for each sample
-    inner_div_score = calc_inner_diversity(batch_indexes,batch_num,aid,aprox_grads)
-    outer_div_score = calc_outer_diversity(batch_indexes,aid,aprox_grads,batch_num,k)
-    #TODO add normalization
-    #combine the scores based on the parameters alpha and beta
-    score = alpha * inner_div_score + beta * outer_div_score
-    return score
-
-def k_diversity(model,train_ds,k,batch_size,alpha,beta,num_classes,conn):
-    #collect the gradient information for all images
-    #last layer gradients from coresets for data efficient training (logits - onehot_label)
-    #TODO possibly wrong here
-    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    for i, (img,label) in enumerate(train_ds.batch(100)):
-        logits = intermediate_layer_model.predict(img)
-        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
-        grads = np.array(logits) - onehot
-        if i == 0:
-            aprox_grads = grads
-        else:
-            aprox_grads= np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
-
-    for i, (img,label) in enumerate(train_ds.batch(100)):
-        softmax = model.predict(img)
-        print("softmax",softmax)
-        pnt()
-        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
-        entropy = np.sum(np.array(softmax) - onehot)
-        if i == 0:
-            e = entropy
-        else:
-            e = np.concatenate((e,entropy),axis=0) # list of the grads [entropy,entorpy]
-
-            
-    #run the submod evaluation
-    #avalible = np.array([x for x in range(ds_size)]) #all indexes avalible
-    curr = conn.cursor()
-    curr.execute(''SELECT id FROM imgs'')
-    avalible = np.array([int(x[0]) for x in curr.fetchall()]) # 1 to n for db ids
-    print(len(avalible),'are avalible to select at start of process')
-
-    batch_indexes = np.zeros((k,batch_size),dtype=int) -1 # [[batch0],[batch1],...,*k] init to -1
-
-    
-    pool = Pool()
-    for b in range(batch_size): #each item goes into one batch at a time
-        for batch_num in range(k):
-            #calc inner batch distance
-            if np.count_nonzero(batch_indexes[batch_num] >= 0) == 0:
-                print('one random start')
-                #if there are no items in the batch do this:
-                #k_means cluster?
-                #TODO some sort of initialization start
-                #random
-                choice = int(random.choice(avalible))
-            else:
-                #calculate inner and outer diversity for all the possible new samples
-                #build the list that is used in the map
-                pool_input = [(aid,batch_indexes,batch_num,approx_grads,k) for aid in avalible]
-                item_scores = pool.starmap(calc_scores, pool_input)
-                #pick greedly the best index and add it to the current batch
-                choice = avalible[np.argmax(item_scores)]#choice is the db id
-                
-            #set the db values to the batch numbers of the images for each upcoming batch
-            batch_indexes[batch_num][b] = choice 
-            curr.execute('' UPDATE imgs SET batch_num = (?) WHERE id = (?) '',(int(batch_num),int(choice),))
-            avalible = np.delete(avalible,avalible==choice)
-            print(batch_indexes)
-
-    #Should end up with a list of lists of indexes of batches here
-    conn.commit()
-'''
 
 def calc_inner_scores(grads):
     return np.sum(np.sum(cdist(grads,grads,metric='euclidean')))
@@ -377,96 +268,121 @@ def array_add(array, item, max_size):
     else:
         return np.concatenate((np.expand_dims(item,axis=0), array))
 
-def sample_batches(model,train_ds,k,batch_size,num_classes,conn,des_inner,des_outer,images_used,mean_saved_gradients):
+def sample_batches(run_type,model,train_it,train_ds,batch_size,num_classes,conn,des_inner=0.5,des_outer=0.5,mean_saved_gradients=None,k=1):
+
     #calculate the approximate grads from model for all data
+    time1 = time.time()
     intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    for i, (img,label) in enumerate(train_ds.batch(100)):
+    for i, (img,label) in enumerate(train_ds.batch(2**11)):
         logits = intermediate_layer_model.predict(img,verbose=0)
-        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
-        grads = np.array(logits) - onehot
+        grads = np.array(logits - tf.one_hot(label,num_classes))
         if i == 0:
             aprox_grads = grads
         else:
             aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
-
+    
+    print("Inference Time:",time.time() - time1)
+    time1 = time.time()
     #create a large number of random number sequences (Possible to do repeates here but unlikely)
     total_seq = 100000
     sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,batch_size)) #lists of random indexes of the grads
 
-    #score each sequence based on inner and outer diversity
-    with Pool(maxtasksperchild=50) as pool:
-        pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
-        scores = pool.starmap(calc_scores,pool_input,chunksize=50,) #shape of sequences
-    
-    #normalise to 0 and 1
-    i_scores = [s[0] for s in scores]
-    o_scores = [s[1] for s in scores]
-    n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
-    n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
+    #based on run type score the sequences
+    if run_type == 'i':
+        #score each sequence based on inner diversity
+        with Pool(maxtasksperchild=1000) as pool:
+            pool_input = [(aprox_grads[s],) for s in sequences]
+            i_scores = pool.starmap(calc_inner_scores,pool_input,chunksize=50,)
+        
+        #normalise the scores
+        n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
 
-    #choose sequence closes to desired inputs and set the sequence in the db
-    s_idx = (np.abs(n_i_scores - des_inner)+np.abs(n_o_scores - des_outer)).argmin()
+        #choose sequence closes to desired inputs and the sequence to use
+        s_idx = np.abs(n_i_scores - des_inner).argmin()
+        sequence = sequences[s_idx]
 
-    
-    #calc the difference between the desired value and the achieved
-    i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
-    o_des_descrep = (np.abs(n_o_scores - des_outer)).min()
+        #calc the difference between the desired value and the achieved
+        i_des_descrep = np.abs(n_i_scores - des_inner).min()
 
-    #the index of data to use
-    sequence = sequences[s_idx]
-    
-    #calc the mean of the chosen gradients and save
-    if mean_saved_gradients is None:
-        mean_saved_gradients = np.expand_dims(np.mean(aprox_grads[sequence],axis=0),axis=0)
+        #wandb logging
+        wandb.log({'mean_i_scores':np.mean(i_scores),
+                    'chosen_i_score':i_scores[s_idx],
+                    'inner_des_diff':i_des_descrep,
+                    'all_i_scores_90':np.percentile(i_scores,90),
+                    'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
+
+    elif run_type == 'o':
+        #score each sequence based on outer diversity
+        with Pool(maxtasksperchild=50) as pool:
+            pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
+            o_scores = pool.starmap(calc_outer_scores,pool_input,chunksize=50,)
+        
+        #normalise the scores
+        n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
+
+        #choose sequence closes to desired inputs and the sequence to use
+        s_idx = np.abs(n_o_scores - des_outer).argmin()
+        sequence = sequences[s_idx]
+
+        #calc the difference between the desired value and the achieved
+        o_des_descrep = np.abs(n_o_scores - des_outer).min()
+
+        #calc the mean of the chosen gradients and save
+        if mean_saved_gradients is None:
+            mean_saved_gradients = np.expand_dims(np.mean(aprox_grads[sequence],axis=0),axis=0)
+        else:
+            mean_saved_gradients = array_add(mean_saved_gradients,np.mean(aprox_grads[sequence],axis=0),k)
+
+        #wandb logging
+        wandb.log({ 'mean_o_scores':np.mean(o_scores),
+                    'chosen_o_score':o_scores[s_idx],
+                    'outer_des_diff':o_des_descrep,
+                    'all_o_scores_90':np.percentile(o_scores,90),
+                    'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
+
+    elif run_type == 'io':
+        #score each sequence based on inner and outer diversity
+        with Pool(maxtasksperchild=50) as pool:
+            pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
+            scores = pool.starmap(calc_scores,pool_input,chunksize=50,)
+
+        #split the scores into inner and outer and normalise
+        i_scores = [s[0] for s in scores]
+        o_scores = [s[1] for s in scores]
+        n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
+        n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
+
+        #choose sequence closes to desired inputs and set the sequence
+        s_idx = (np.abs(n_i_scores - des_inner)+np.abs(n_o_scores - des_outer)).argmin()
+        sequence = sequences[s_idx]
+
+        #calc the difference between the desired value and the achieved
+        i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
+        o_des_descrep = (np.abs(n_o_scores - des_outer)).min()
+
+        #calc the mean of the chosen gradients and save
+        if mean_saved_gradients is None:
+            mean_saved_gradients = np.expand_dims(np.mean(aprox_grads[sequence],axis=0),axis=0)
+        else:
+            mean_saved_gradients = array_add(mean_saved_gradients,np.mean(aprox_grads[sequence],axis=0),k)
+        
+        #wandb logging
+        wandb.log({ 'mean_o_scores':np.mean(o_scores),
+                    'chosen_o_score':o_scores[s_idx],
+                    'outer_des_diff':o_des_descrep,
+                    'all_o_scores_90':np.percentile(o_scores,90),
+                    'all_o_scores_10':np.percentile(o_scores,10),
+                    'mean_i_scores':np.mean(i_scores),
+                    'chosen_i_score':i_scores[s_idx],
+                    'inner_des_diff':i_des_descrep,
+                    'all_i_scores_90':np.percentile(i_scores,90),
+                    'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
+
     else:
-        mean_saved_gradients = array_add(mean_saved_gradients,np.mean(aprox_grads[sequence],axis=0),k)
-
-    
-    #saving to the database
-    curr = conn.cursor()
-    b_num = 0
-    for i,idx in enumerate(sequence):
-        if i != 0:
-            b_num = i // batch_size
-        images_used[idx] += 1
-        curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
-    conn.commit()
-
-    return i_scores,o_scores, s_idx, i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients
-    
-def sample_batches_inner_only(model,train_ds,batch_size,num_classes,conn,des_inner):
-    #calculate the approximate grads from model for all data
-    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    for i, (img,label) in enumerate(train_ds.batch(100)):
-        logits = intermediate_layer_model.predict(img,verbose=0)
-        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
-        grads = np.array(logits) - onehot
-        if i == 0:
-            aprox_grads = grads
-        else:
-            aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
-
-    #create a large number of random number sequences (Possible to do repeates here but unlikely)
-    total_seq = 100000
-    sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,batch_size)) #lists of random indexes of the grads
-
-    #score each sequence based on inner and outer diversity
-    with Pool(maxtasksperchild=50) as pool:
-        pool_input = [(aprox_grads[s],) for s in sequences]
-        i_scores = pool.starmap(calc_inner_scores,pool_input,chunksize=50,) #shape of sequences
-    
-    #normalise to 0 and 1
-    n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
-
-    #choose sequence closes to desired inputs and set the sequence in the db
-    s_idx = np.abs(n_i_scores - des_inner).argmin()
-
-    #calc the difference between the desired value and the achieved
-    i_des_descrep = (np.abs(n_i_scores - des_inner)).min()
-
-    #the index of data to use
-    sequence = sequences[s_idx]
-    
+        print("Invalid run type")
+        return
+    print("Sequence chosen time: ",time.time()-time1)
+    time1 = time.time()
     #saving to the database
     curr = conn.cursor()
     b_num = 0
@@ -475,56 +391,6 @@ def sample_batches_inner_only(model,train_ds,batch_size,num_classes,conn,des_inn
             b_num = i // batch_size
         curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
     conn.commit()
-
-    return i_scores, s_idx, i_des_descrep, n_i_scores
-
-def sample_batches_outer_only(model,train_ds,k,batch_size,num_classes,conn,des_outer,mean_saved_gradients):
-    #calculate the approximate grads from model for all data
-    intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    for i, (img,label) in enumerate(train_ds.batch(100)):
-        logits = intermediate_layer_model.predict(img,verbose=0)
-        onehot = np.array([[1 if x == l else 0 for x in range(num_classes)] for l in label])
-        grads = np.array(logits) - onehot
-        if i == 0:
-            aprox_grads = grads
-        else:
-            aprox_grads = np.concatenate((aprox_grads,grads),axis=0) # list of the grads [[grads],[grads],...]
-
-    #create a large number of random number sequences (Possible to do repeates here but unlikely)
-    total_seq = 100000
-    sequences = np.random.randint(0,len(aprox_grads),size=(total_seq,batch_size)) #lists of random indexes of the grads
-
-    #score each sequence based on inner and outer diversity
-    with Pool(maxtasksperchild=50) as pool:
-        pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
-        o_scores = pool.starmap(calc_outer_scores,pool_input,chunksize=50,) #shape of sequences
+    print("Saving to database time: ",time.time()-time1)
+    return mean_saved_gradients
     
-    #normalise to 0 and 1
-    n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
-
-    #choose sequence closes to desired inputs and set the sequence in the db
-    s_idx = (np.abs(n_o_scores - des_outer)).argmin()
-
-    #calc the difference between the desired value and the achieved
-    o_des_descrep = (np.abs(n_o_scores - des_outer)).min()
-
-    #the index of data to use
-    sequence = sequences[s_idx]
-    
-    #calc the mean of the chosen gradients and save
-    if mean_saved_gradients is None:
-        mean_saved_gradients = np.expand_dims(np.mean(aprox_grads[sequence],axis=0),axis=0)
-    else:
-        mean_saved_gradients = array_add(mean_saved_gradients,np.mean(aprox_grads[sequence],axis=0),k)
-
-    
-    #saving to the database
-    curr = conn.cursor()
-    b_num = 0
-    for i,idx in enumerate(sequence):
-        if i != 0:
-            b_num = i // batch_size
-        curr.execute(''' UPDATE imgs SET batch_num = (?) WHERE id = (?) ''',(int(b_num),int(idx),))
-    conn.commit()
-
-    return o_scores, s_idx, o_des_descrep, mean_saved_gradients

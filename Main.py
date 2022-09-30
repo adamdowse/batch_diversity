@@ -33,13 +33,13 @@ def test_step(imgs, labels):
 config= {
     'db_path' : "DBs/",
     'ds_name' : "mnist",
-    'train_percent' : 0.01,
-    'test_percent' : 0.01,
-    'group' : 'o_test',
+    'train_percent' : 1,
+    'test_percent' : 1,
+    'group' : 't2_o_test',
     'model_name' : 'Simple_CNN',
-    'learning_rate' : 0.001,
-    'warm_start' : 1,
-    'batch_size' : 32,
+    'learning_rate' : 0.005,
+    'warm_start_batches' : 0,
+    'batch_size' : 128,
     'max_its' : 2000,
     'k' : 1,
     'des_inner' : np.random.rand(),
@@ -74,7 +74,8 @@ if __name__ == "__main__":
         conn = conn,
         batch_size = config['batch_size'], 
         num_classes = num_classes,
-        num_images = num_train_imgs
+        num_images = num_train_imgs,
+        warm_start_batches = config['warm_start_batches']
     )
 
     #Main loop
@@ -85,72 +86,25 @@ if __name__ == "__main__":
 
     images_used = np.zeros(num_train_imgs)
     mean_saved_gradients = None
-    #tracemalloc.start()
     
     while train_it < config['max_its']:
-            #start_snapshot=tracemalloc.take_snapshot()
-        print("Itt",train_it)
-        if train_it >= (config['warm_start'] * train_data_gen.ret_batch_info()):
-            if config['run_type'] == 'io':
-                i_scores, o_scores,idx,i_des_descrep, o_des_descrep, n_i_scores, mean_saved_gradients = sf.sample_batches(model,train_ds,config["k"],config["batch_size"],num_classes,conn,config["des_inner"],config["des_outer"],images_used,mean_saved_gradients)
+        print("Iteration:",train_it)
+        if train_it >= config['warm_start_batches']:
+            mean_saved_gradients = sf.sample_batches(config['run_type'],model,train_it,train_ds,config['batch_size'],num_classes,conn,des_inner=config['des_inner'],des_outer=config['des_outer'],mean_saved_gradients=mean_saved_gradients,k=config['k'])
 
-            elif config['run_type'] == 'i':
-                i_scores,idx,i_des_descrep,n_i_scores = sf.sample_batches_inner_only(model,train_ds,config["batch_size"],num_classes,conn,config["des_inner"])
-                o_scores = np.zeros_like(i_scores)
-                o_des_descrep = 0
-
-            elif config['run_type'] == 'o':
-                o_scores, idx, o_des_descrep, mean_saved_gradients = sf.sample_batches_outer_only(model,train_ds,config['k'],config['batch_size'],num_classes,conn,config['des_outer'],mean_saved_gradients)
-                i_scores = np.zeros_like(o_scores)
-                i_des_descrep = 0
-            else:
-                print("ERROR: Incorrect run type in config.")
-
-                
         for i, (X,Y) in enumerate(train_data_gen):
-            #do k iterations on batches (first round is at least 1 full epoch run)
             #train function
             train_step(X[1],Y)
             train_it += 1
         
         #calc stats and logging
-        if train_it > (config['warm_start'] * train_data_gen.ret_batch_info()):
-            if config['run_type'] == 'io':
-                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                            'train_loss':train_loss.result().numpy(),
-                            'mean_i_scores':np.mean(i_scores),
-                            'mean_o_scores':np.mean(o_scores),
-                            'chosen_i_score':i_scores[idx],
-                            'chosen_o_score':o_scores[idx],
-                            'inner_des_diff':i_des_descrep,
-                            'outer_des_diff':o_des_descrep,
-                            'all_i_scores_90':np.percentile(i_scores,90),
-                            'all_i_scores_10':np.percentile(i_scores,10),
-                            'all_o_scores_90':np.percentile(o_scores,90),
-                            'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
-            elif config['run_type'] == 'i':
-                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                            'train_loss':train_loss.result().numpy(),
-                            'mean_i_scores':np.mean(i_scores),
-                            'chosen_i_score':i_scores[idx],
-                            'inner_des_diff':i_des_descrep,
-                            'all_i_scores_90':np.percentile(i_scores,90),
-                            'all_i_scores_10':np.percentile(i_scores,10)},step=train_it)
-            else:
-                wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                            'train_loss':train_loss.result().numpy(),
-                            'mean_o_scores':np.mean(o_scores),
-                            'chosen_o_score':o_scores[idx],
-                            'outer_des_diff':o_des_descrep,
-                            'all_o_scores_90':np.percentile(o_scores,90),
-                            'all_o_scores_10':np.percentile(o_scores,10)},step=train_it)
-        else:
-            wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                        'train_loss':train_loss.result().numpy()},step=train_it)
+        wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                    'train_loss':train_loss.result().numpy()},step=train_it)
 
         #reset the batch numbers to 0
         train_data_gen.on_epoch_end()
 
+        #test model
         if test_it > test_cap:
             for X,Y in test_ds.batch(100):
                 Y = tf.one_hot(Y,num_classes)
