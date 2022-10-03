@@ -32,19 +32,19 @@ def test_step(imgs, labels):
 #/DBs/
 config= {
     'db_path' : "DBs/",
-    'ds_name' : "mnist",
+    'ds_name' : "cifar10",
     'train_percent' : 1,
     'test_percent' : 1,
-    'group' : 't2_o_test',
-    'model_name' : 'Simple_CNN',
-    'learning_rate' : 0.005,
+    'group' : 't3_o_test',
+    'model_name' : 'AlexNet',
+    'learning_rate' : 0.01,
     'warm_start_batches' : 0,
-    'batch_size' : 128,
+    'batch_size' : 32,
     'max_its' : 2000,
     'k' : 1,
     'des_inner' : np.random.rand(),
     'des_outer' : np.random.rand(),
-    'random_db' : 'True',
+    'random_db' : 'False',
     'run_type'  : 'o'
     }
 

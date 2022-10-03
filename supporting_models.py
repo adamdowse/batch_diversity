@@ -43,7 +43,8 @@ def AlexNet (num_classes,in_shape):
 
         layers.Dense(4096, activation='relu'),
         layers.Dropout(0.5),
-        layers.Dense(num_classes, activation='softmax')
+        layers.Dense(num_classes),
+        layers.Softmax()
     ])
     return model
 

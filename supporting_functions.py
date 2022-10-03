@@ -273,7 +273,7 @@ def sample_batches(run_type,model,train_it,train_ds,batch_size,num_classes,conn,
     #calculate the approximate grads from model for all data
     time1 = time.time()
     intermediate_layer_model = Model(inputs=model.input, outputs=model.layers[-1].input) #logits
-    for i, (img,label) in enumerate(train_ds.batch(2**11)):
+    for i, (img,label) in enumerate(train_ds.batch(2**11)): #2**11
         logits = intermediate_layer_model.predict(img,verbose=0)
         grads = np.array(logits - tf.one_hot(label,num_classes))
         if i == 0:
