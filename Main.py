@@ -48,7 +48,7 @@ config= {
     'run_type'  : 'o'
     }
 
-disabled = False
+disabled = True
 
 if __name__ == "__main__":
     #Setup

@@ -227,7 +227,7 @@ def setup_model(config,num_classes,img_shape):
     return model,optimizer,loss_func,train_loss,train_acc_metric,test_loss,test_acc_metric
 
 def calc_inner_scores(grads):
-    return np.sum(np.sum(cdist(grads,grads,metric='euclidean')))
+    return np.sum(np.sum(cdist(grads,grads,metric='euclidean')))/(grads.shape[0]**2 - grads.shape[0])
 
 def calc_outer_scores(grads,mean_saved_gradients):
     if mean_saved_gradients is None:
@@ -237,13 +237,13 @@ def calc_outer_scores(grads,mean_saved_gradients):
         if mean_current_grads.ndim == 1:
             mean_current_grads = np.expand_dims(mean_current_grads,axis=0)
         dists = cdist(mean_current_grads,mean_saved_gradients,metric='euclidean')
-        outer_div = np.sum(np.sum(dists)) / mean_saved_gradients.shape[0] ** 2
+        outer_div = np.sum(np.sum(dists)) / 2
     return outer_div
 
 def calc_scores(grads,mean_saved_gradients):
     #calc the inner diversity of the selected grads
     dists = cdist(grads,grads,metric='euclidean')
-    inner_div = np.sum(np.sum(dists)) / len(dists)**2
+    inner_div = np.sum(np.sum(dists)) /(len(dists)**2 - len(dists))
 
     #calc outer div with the means of the prevous batches
     #mean_saved_gradients = [[batch_mean_grads],[...],...]
@@ -255,7 +255,7 @@ def calc_scores(grads,mean_saved_gradients):
         if mean_current_grads.ndim == 1:
             mean_current_grads = np.expand_dims(mean_current_grads,axis=0)
         dists = cdist(mean_current_grads,mean_saved_gradients,metric='euclidean')
-        outer_div = np.sum(np.sum(dists)) / mean_saved_gradients.shape[0] ** 2
+        outer_div = np.sum(np.sum(dists)) / 2
 
     return (inner_div, outer_div,)
 
@@ -290,10 +290,11 @@ def sample_batches(run_type,model,train_it,train_ds,batch_size,num_classes,conn,
     #based on run type score the sequences
     if run_type == 'i':
         #score each sequence based on inner diversity
-        with Pool(maxtasksperchild=1000) as pool:
-            pool_input = [(aprox_grads[s],) for s in sequences]
-            i_scores = pool.starmap(calc_inner_scores,pool_input,chunksize=50,)
-        
+        #with Pool(maxtasksperchild=1000) as pool:
+        #    pool_input = [(aprox_grads[s],) for s in sequences]
+        #    i_scores = pool.starmap(calc_inner_scores,pool_input,chunksize=50,)
+        i_scores = [calc_inner_scores(aprox_grads[s]) for s in sequences]
+
         #normalise the scores
         n_i_scores = (i_scores - np.min(i_scores)) / (np.max(i_scores) - np.min(i_scores))
 
@@ -313,9 +314,12 @@ def sample_batches(run_type,model,train_it,train_ds,batch_size,num_classes,conn,
 
     elif run_type == 'o':
         #score each sequence based on outer diversity
-        with Pool(maxtasksperchild=50) as pool:
-            pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
-            o_scores = pool.starmap(calc_outer_scores,pool_input,chunksize=50,)
+        #with Pool(maxtasksperchild=50) as pool:
+        #    pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
+        #    o_scores = pool.starmap(calc_outer_scores,pool_input,chunksize=50,)
+        
+        o_scores = [calc_outer_scores(aprox_grads[s],mean_saved_gradients) for s in sequences]
+        
         
         #normalise the scores
         n_o_scores = (o_scores - np.min(o_scores)) / (np.max(o_scores) - np.min(o_scores))
@@ -342,10 +346,10 @@ def sample_batches(run_type,model,train_it,train_ds,batch_size,num_classes,conn,
 
     elif run_type == 'io':
         #score each sequence based on inner and outer diversity
-        with Pool(maxtasksperchild=50) as pool:
-            pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
-            scores = pool.starmap(calc_scores,pool_input,chunksize=50,)
-
+        #with Pool(maxtasksperchild=50) as pool:
+        #    pool_input = [(aprox_grads[s],mean_saved_gradients,) for s in sequences]
+        #    scores = pool.starmap(calc_scores,pool_input,chunksize=50,)
+        scores = [calc_scores(aprox_grads[s],mean_saved_gradients) for s in sequences]
         #split the scores into inner and outer and normalise
         i_scores = [s[0] for s in scores]
         o_scores = [s[1] for s in scores]
