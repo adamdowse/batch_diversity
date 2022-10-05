@@ -97,9 +97,10 @@ if __name__ == "__main__":
             train_step(X[1],Y)
             train_it += 1
         
-        #calc stats and logging
-        wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
-                    'train_loss':train_loss.result().numpy()},step=train_it)
+        if train_it % 10 == 0:
+            #calc stats and logging
+            wandb.log({ 'train_acc':train_acc_metric.result().numpy(),
+                        'train_loss':train_loss.result().numpy()},step=train_it)
 
         #reset the batch numbers to 0
         train_data_gen.on_epoch_end()
