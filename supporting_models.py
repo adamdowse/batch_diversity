@@ -9,8 +9,8 @@ def Simple_CNN(num_classes,in_shape):
         layers.Conv2D(32,(3,3), activation='relu',input_shape=in_shape),
         layers.MaxPool2D((2,2)),
         layers.Flatten(),
-        layers.Dense(100,activation='relu'),
-        layers.Dense(num_classes),
+        layers.Dense(100,activation='relu',name="penultimate_layer"),
+        layers.Dense(num_classes,name="last_layer"),
         layers.Softmax()
     ])
     return model
@@ -41,9 +41,9 @@ def AlexNet (num_classes,in_shape):
         layers.Dense(4096, activation='relu'),
         layers.Dropout(0.5),
 
-        layers.Dense(4096, activation='relu'),
+        layers.Dense(4096, activation='relu',name="penultimate_layer"),
         layers.Dropout(0.5),
-        layers.Dense(num_classes),
+        layers.Dense(num_classes,name="last_layer"),
         layers.Softmax()
     ])
     return model

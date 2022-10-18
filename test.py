@@ -1,6 +1,9 @@
 import numpy as np
-a = np.array([1,2,3,4,5,6,7])
+a = np.array([1,2,3,4,5,6,7,8,9,10])
+b = np.array([1,3,5])
 
-b = np.concatenate(([10],a[:-1]))
+c = np.ones(a.size,dtype=bool)
+c[b] = False
 
-print(b)
+print(a[b])
+print(a[c])
