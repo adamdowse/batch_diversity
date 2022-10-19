@@ -27,7 +27,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #init db connection and init vars
         self.db_path = db_path
         self.batch_size = batch_size
-        self.batch_indexes = np.array([])
         self.modifiers = modifiers
         try:
             conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
@@ -37,7 +36,10 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.num_classes = curr.execute('''SELECT COUNT(DISTINCT label_num) FROM imgs''').fetchone()[0]
         self.num_images = curr.execute('''SELECT COUNT(id) FROM imgs''').fetchone()[0]
         conn.close()
+        self.img_count_store = np.zeros(self.num_images)
         self.num_batches = int(np.ceil(self.num_images/self.batch_size))
+        self.on_epoch_end()
+        self.set_indexes = np.array([],dtype=int)
 
         #Logging
         print("Number of classes: ", self.num_classes)
@@ -50,8 +52,21 @@ class SubModDataGen(tf.keras.utils.Sequence):
     def ret_batch_info(self):
         return self.num_batches
 
+    def on_epoch_end(self):
+        #called at the end of each epoch
+        #reset the indexes
+        self.indexes = np.arange(self.num_images, dtype=int)
+
     def __getitem__(self, index):
         #gets the next batch of data
+        #build a batch via submodular selection
+        #calculate the scores for each image
+
+        #gets the indexes of the images to use in the next batch and removes them form the set of available images
+        self.get_submod_indexes()
+
+        #update what images have been used in batches
+        self.img_count_store[self.set_indexes] += 1
 
         #pull the data from the database
         try:
@@ -61,14 +76,16 @@ class SubModDataGen(tf.keras.utils.Sequence):
         curr = conn.cursor()
         imgs = []
         labels = []
-        for bi in self.batch_indexes:
-            curr.execute('SELECT data, label_num FROM imgs WHERE id = (?)', (int(bi),))
+
+        for bi in self.set_indexes:
+            curr.execute('SELECT data, label_num FROM imgs WHERE id = (?)', (int(bi+1),))
             data = curr.fetchall()[0]
             imgs.append(data[0])
             labels.append(data[1])
 
         conn.close()
-
+        self.set_indexes = np.array([],dtype=int)
+        
         #convert to tensors
         imgs = tf.cast(np.array(imgs),'float32')
         labels = tf.one_hot(np.array(labels),self.num_classes)
@@ -77,12 +94,10 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
     def __len__(self):
         #calculates the number of batches to use
-        return 1
+        return int(self.num_images/self.batch_size) - 1
 
 
-    def score_images(self,model):
-        #run the scoring functions through all the images in the database
-        #TODO look into using multiprocessing to speed this up
+    def get_submod_indexes(self):
 
         def Norm(A):
             if np.sum(A) == 0:
@@ -104,12 +119,11 @@ class SubModDataGen(tf.keras.utils.Sequence):
             #calculate the redundancy score for each image in the database
             # the point shoulde be as far away from the other points in the set as possible
             #model: the model to use to calculate the redundancy score
-            
             if len(set_indexes) != 0:
                 #calculate the redundancy score
                 return  np.min(cdist(pl_activations[set_indexes],pl_activations[indexes]),axis=0)
             else:
-                return np.zeros(len(pl_activations))
+                return np.zeros(len(indexes))
 
         def Mean_Close_Score(pl_activations,indexes):
             #calculate the mean close score for each image in the database
@@ -119,7 +133,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
             d = cdist([np.mean(pl_activations,axis=0)],pl_activations[indexes],metric='sqeuclidean')
             return -np.squeeze(d)
 
-        
         def Feature_Match_Score(pl_activations,set_indexes,indexes):
             #calculate the feature match score for each image in the database
 
@@ -135,8 +148,33 @@ class SubModDataGen(tf.keras.utils.Sequence):
             else:
                 subset_scores = np.sum(pl_softmax[set_indexes],axis=0)
                 return np.sum(np.sqrt( subset_scores + pl_softmax[indexes]),axis=1)
+        
+        #get the indexes of the images to use in the next batch
+        if len(self.indexes) < self.batch_size: max_its = len(self.indexes)
+        else: max_its = self.batch_size
+        for i in range(max_its):
+            #calculate the scores for each image
+            U_S = Uncertainty_Score(self.preds,self.indexes)
+            R_S = Redundancy_Score(self.pl_activations,self.set_indexes,self.indexes)
+            MC_S = Mean_Close_Score(self.pl_activations,self.indexes)
+            FM_S = Feature_Match_Score(self.ll_activations,self.set_indexes,self.indexes)
+
+            #calculate the total score
+            scores = (Norm(U_S*self.modifiers[0]) + 
+                        Norm(R_S*self.modifiers[1]) + 
+                        Norm(MC_S*self.modifiers[2]) + 
+                        Norm(FM_S*self.modifiers[3]))
+            
+            #get the index of the image with the highest score
+            max_index = np.argmax(scores)
+            #add the index to the set
+            self.set_indexes = np.append(self.set_indexes,self.indexes[max_index])
+            #remove the index from the indexes
+            self.indexes = np.delete(self.indexes,max_index)
 
 
+    def get_activations(self,model):
+        #TODO look into using multiprocessing to speed this up
 
         #calculate the ll_activations for all images
         #get the data from the database
@@ -149,64 +187,23 @@ class SubModDataGen(tf.keras.utils.Sequence):
         imgs = []
         for img in curr:
             imgs.append(img)
-        
         conn.close()
 
-    
         #convert to tensor
         imgs = np.array(imgs)
         imgs = np.squeeze(imgs,axis=1)
-        print(imgs.shape)
         imgs = tf.cast(imgs,'float32')
 
         #run the model on the data so we get last layer activations
         ll_model = Model(inputs=model.input, outputs=model.get_layer('last_layer').output)
-        ll_activations = ll_model.predict(imgs)
-        print("ll_activations:",ll_activations.shape)
+        self.ll_activations = ll_model.predict(imgs)
 
         #run the model on the data so we get the penultimate layer activations
         pl_model = Model(inputs=model.input, outputs=model.get_layer('penultimate_layer').output)
-        pl_activations = pl_model.predict(imgs)
-        print("pl_activations:",pl_activations.shape)
-
+        self.pl_activations = pl_model.predict(imgs)
 
         #run the model on the data so we get the softmax outputs
-        preds = model.predict(imgs)
-        print("preds:",preds.shape)
-
-
-        #build a batch via submodular selection
-        #calculate the scores for each image
-        indexes = np.arange(self.num_images,dtype=int)
-        set_indexes = np.array([],dtype=int)
-        for i in range(self.batch_size):
-            #calculate the scores for each image
-            U_S = Uncertainty_Score(preds,indexes)
-            R_S = Redundancy_Score(pl_activations,set_indexes,indexes)
-            MC_S = Mean_Close_Score(pl_activations,indexes)
-            FM_S = Feature_Match_Score(ll_activations,set_indexes,indexes)
-
-
-            #calculate the total score
-            scores = (Norm(U_S*self.modifiers[0]) + 
-                        Norm(R_S*self.modifiers[1]) + 
-                        Norm(MC_S*self.modifiers[2]) + 
-                        Norm(FM_S*self.modifiers[3]))
-            
-            #print(scores)
-
-            #get the index of the image with the highest score
-            max_index = np.argmax(scores)
-            #add the index to the set
-            set_indexes = np.append(set_indexes,indexes[max_index])
-            #remove the index from the indexes
-            indexes = np.delete(indexes,max_index)
-        
-        #set the self variables as the indexes of the images in the batch
-        print(set_indexes)
-        self.batch_indexes = set_indexes
-        
-        
+        self.preds = model.predict(imgs)
 
 
 def setup_db(config):
