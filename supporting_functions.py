@@ -216,7 +216,7 @@ def setup_model(config,num_classes,img_shape):
     model.build(img_shape+(1,))
     print('built model with input shape =',img_shape+(1,))
     model.summary()
-    optimizer = keras.optimizers.SGD(learning_rate=config['learning_rate']),
+    optimizer = keras.optimizers.SGD(learning_rate=config['learning_rate'])
     #loss_func = keras.losses.CategoricalCrossentropy(from_logits=False,reduction=tf.keras.losses.Reduction.NONE)
     loss_func = keras.losses.CategoricalCrossentropy(from_logits=False)
 

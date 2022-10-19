@@ -1,6 +1,7 @@
 import SubMod_supporting_functions as sf
 import supporting_models as sm
 import tensorflow as tf
+from tensorflow import keras
 import wandb
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,13 +9,11 @@ import matplotlib.pyplot as plt
 
 @tf.function
 def train_step(imgs,labels):
-    print(labels)
-    print(imgs)
     with tf.GradientTape() as tape:
         preds = model(imgs,training=True)
         loss = loss_func(labels,preds)
     grads = tape.gradient(loss,model.trainable_variables)
-    optimizer[0].apply_gradients(zip(grads,model.trainable_variables))
+    optimizer.apply_gradients(zip(grads,model.trainable_variables))
     train_loss(loss)
     train_acc_metric(labels,preds)
     return
@@ -47,7 +46,7 @@ disabled = True
 
 if __name__ == "__main__":
     #Setup
-    test_ds,ds_info,conn = sf.setup_db(config)
+    test_ds,ds_info,conn_path = sf.setup_db(config)
 
     num_classes = ds_info.features['label'].num_classes
     class_names = ds_info.features['label'].names
@@ -55,6 +54,7 @@ if __name__ == "__main__":
     num_train_imgs = ds_info.splits['train[:'+str(int(config['train_percent']*100))+'%]'].num_examples
 
     #Model
+    tf.keras.backend.clear_session()
     model = sm.select_model(config['model_name'],num_classes,img_size)
     model.build(img_size+(1,))
     model.summary()
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
     #Optimizer
-    optimizer = [tf.keras.optimizers.SGD(learning_rate=config['learning_rate'])]
+    optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'])
 
     #Metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -72,7 +72,13 @@ if __name__ == "__main__":
     test_acc_metric = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #Data Generator
-    train_DG = sf.SubModDataGen(conn,config['batch_size'],config['modifiers'])
+    train_DG = sf.SubModDataGen(conn_path,config['batch_size'],config['modifiers'])
+
+    #Compile Model
+    model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy'])
+
+    #Wandb
+    sf.wandb_setup(config,disabled)
 
     #Training
     for b in range(config['max_its']):
@@ -84,14 +90,19 @@ if __name__ == "__main__":
 
         #Training
         train_DG.score_images(model)
-        for i, (imgs,labels) in enumerate(train_DG): #this should just be one batch
-            print("Batch shape: ", imgs.shape, labels.shape)
-            train_step(imgs,labels)
+        model.fit(train_DG,epochs=1,verbose=1,workers=1,use_multiprocessing=False)
+        
+        #for i, (imgs,labels) in enumerate(train_DG): #this should just be one batch
+        #    print("Batch shape: ", imgs.shape, labels.shape)
+        #    train_step(imgs,labels)
 
         #Testing
         if b % 50 == 0:
-            for imgs,labels in test_ds:
-                test_step(imgs,labels)
+            for img, label in test_ds.batch(32):
+                label = tf.one_hot(label,num_classes)
+                model.evaluate(img,label,verbose=1,workers=1,use_multiprocessing=False)
+            #for imgs,labels in test_ds:
+            #    test_step(imgs,labels)
         
 
         #Logging

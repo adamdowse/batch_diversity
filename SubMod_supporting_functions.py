@@ -11,11 +11,13 @@ import numpy as np
 import scipy
 from scipy.spatial.distance import cdist
 import random
+import os
+import wandb
 
 #The train data generator
 class SubModDataGen(tf.keras.utils.Sequence):
     #This Generator is used to generate batches of data for the training of the model via submodular selection
-    def __init__(self, conn, batch_size, modifiers):
+    def __init__(self, db_path, batch_size, modifiers):
         #INIT:
         #conn: the connection to the database
         #batch_size: the size of the batch to use
@@ -23,13 +25,18 @@ class SubModDataGen(tf.keras.utils.Sequence):
         print("Starting SubMod Data Generator")
 
         #init db connection and init vars
-        self.conn = conn
+        self.db_path = db_path
         self.batch_size = batch_size
         self.batch_indexes = np.array([])
         self.modifiers = modifiers
+        try:
+            conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
+        except Error as e:
+            print(e)
         curr = conn.cursor()
         self.num_classes = curr.execute('''SELECT COUNT(DISTINCT label_num) FROM imgs''').fetchone()[0]
         self.num_images = curr.execute('''SELECT COUNT(id) FROM imgs''').fetchone()[0]
+        conn.close()
         self.num_batches = int(np.ceil(self.num_images/self.batch_size))
 
         #Logging
@@ -47,7 +54,11 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #gets the next batch of data
 
         #pull the data from the database
-        curr = self.conn.cursor()
+        try:
+            conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
+        except Error as e:
+            print(e)
+        curr = conn.cursor()
         imgs = []
         labels = []
         for bi in self.batch_indexes:
@@ -56,22 +67,18 @@ class SubModDataGen(tf.keras.utils.Sequence):
             imgs.append(data[0])
             labels.append(data[1])
 
-        
+        conn.close()
+
         #convert to tensors
         imgs = tf.cast(np.array(imgs),'float32')
         labels = tf.one_hot(np.array(labels),self.num_classes)
 
-        
-
-        return tuple(imgs, labels)
+        return (imgs, labels,)
 
     def __len__(self):
         #calculates the number of batches to use
         return 1
 
-    def __del__(self):
-        #close the database connection
-        self.conn.close()
 
     def score_images(self,model):
         #run the scoring functions through all the images in the database
@@ -133,11 +140,17 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
         #calculate the ll_activations for all images
         #get the data from the database
-        curr = self.conn.cursor()
+        try:
+            conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
+        except Error as e:
+            print(e)
+        curr = conn.cursor()
         curr.execute('''SELECT data FROM imgs''')
         imgs = []
         for img in curr:
             imgs.append(img)
+        
+        conn.close()
 
     
         #convert to tensor
@@ -274,4 +287,13 @@ def setup_db(config):
         DB_add_img(conn, data_to_add)
 
     conn.commit()
-    return test_ds, ds_info, conn
+    conn.close()
+    return test_ds, ds_info, conn_path
+
+def wandb_setup(config,disabled):
+    #Setup logs and records
+    os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
+    if disabled:
+        os.environ['WANDB_DISABLED'] = 'true'
+    wandb.login()
+    wandb.init(project='k_diversity',entity='adamdowse',config=config,group=config['group'])
