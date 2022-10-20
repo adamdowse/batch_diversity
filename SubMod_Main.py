@@ -23,7 +23,8 @@ config= {
     'momentum' : 0.9,
     'random_db' : 'True',
     'batch_size' : 50,
-    'max_its' : 100
+    'max_its' : 100,
+    'mod_type' : 'Div_min'
     }
 
 disabled = False
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     test_acc_metric = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #Data Generator
-    train_DG = sf.SubModDataGen(conn_path,config['batch_size'],config['modifiers'])
+    train_DG = sf.SubModDataGen(conn_path,config['batch_size'],config['modifiers'],config['mod_type'])
 
     #Compile Model
     model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy','mse'])

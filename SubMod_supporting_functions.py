@@ -17,7 +17,7 @@ import wandb
 #The train data generator
 class SubModDataGen(tf.keras.utils.Sequence):
     #This Generator is used to generate batches of data for the training of the model via submodular selection
-    def __init__(self, db_path, batch_size, modifiers):
+    def __init__(self, db_path, batch_size, modifiers,mod_type):
         #INIT:
         #conn: the connection to the database
         #batch_size: the size of the batch to use
@@ -26,6 +26,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
         #init db connection and init vars
         self.db_path = db_path
+        self.mod_type = mod_type
         self.batch_size = batch_size
         self.modifiers = modifiers
         try:
@@ -159,11 +160,18 @@ class SubModDataGen(tf.keras.utils.Sequence):
             MC_S = Mean_Close_Score(self.pl_activations,self.indexes)
             FM_S = Feature_Match_Score(self.ll_activations,self.set_indexes,self.indexes)
 
-            #calculate the total score
-            scores = (Norm(U_S*self.modifiers[0]) + 
-                        Norm(R_S*self.modifiers[1]) + 
-                        Norm(MC_S*self.modifiers[2]) + 
-                        Norm(FM_S*self.modifiers[3]))
+            if self.mod_type == 'Div_min':
+                #calculate the total score
+                scores = (Norm(U_S*self.modifiers[0]) + 
+                            Norm((1/R_S)*self.modifiers[1]) + 
+                            Norm(MC_S*self.modifiers[2]) + 
+                            Norm(FM_S*self.modifiers[3]))
+            else:
+                #calculate the total score
+                scores = (Norm(U_S*self.modifiers[0]) + 
+                            Norm(R_S*self.modifiers[1]) + 
+                            Norm(MC_S*self.modifiers[2]) + 
+                            Norm(FM_S*self.modifiers[3]))
             
             #get the index of the image with the highest score
             max_index = np.argmax(scores)
