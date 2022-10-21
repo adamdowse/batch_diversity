@@ -12,13 +12,13 @@ import matplotlib.pyplot as plt
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
 #/DBs/
 config= {
-    'db_path' : "DBs/",
+    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
     'ds_name' : "cifar10",
     'train_percent' : 0.1,
     'test_percent' : 0.1,
     'group' : 't7_SubMod',
     'model_name' : 'Simple_CNN',
-    'modifiers' : [0.2,0.1,0.5,0.2],
+    'modifiers' : [0,1,0,0],
     'learning_rate' : 0.001,
     'momentum' : 0,
     'random_db' : 'True',
@@ -27,7 +27,7 @@ config= {
     'mod_type' : 'Div_min_0momentum'
     }
 
-disabled = True
+disabled = False
 
 if __name__ == "__main__":
 
