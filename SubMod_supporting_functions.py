@@ -62,9 +62,15 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #gets the next batch of data
         #build a batch via submodular selection
         #calculate the scores for each image
-
-        #gets the indexes of the images to use in the next batch and removes them form the set of available images
-        self.get_submod_indexes()
+        if self.mod_type == 'random':
+            choices = np.random.randint(0,len(self.indexes),self.batch_size)
+            #add the index to the set
+            self.set_indexes = self.indexes[choices]
+            #remove the index from the indexes
+            self.indexes = np.delete(self.indexes,choices)
+        else:
+            #gets the indexes of the images to use in the next batch and removes them form the set of available images
+            self.get_submod_indexes()
 
         #update what images have been used in batches
         self.img_count_store[self.set_indexes] += 1
@@ -173,8 +179,13 @@ class SubModDataGen(tf.keras.utils.Sequence):
                             Norm(MC_S*self.modifiers[2]) + 
                             Norm(FM_S*self.modifiers[3]))
             
-            #get the index of the image with the highest score
-            max_index = np.argmax(scores)
+            #if the sum of the scores is 0, then select a random image
+            if np.sum(scores) == 0:
+                #select a random image
+                max_index = np.random.randint(0,len(scores))
+            else:
+                #get the index of the image with the highest score
+                max_index = np.argmax(scores)
             #add the index to the set
             self.set_indexes = np.append(self.set_indexes,self.indexes[max_index])
             #remove the index from the indexes
@@ -183,7 +194,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
     def get_activations(self,model):
         #TODO look into using multiprocessing to speed this up
-
+        
         #calculate the ll_activations for all images
         #get the data from the database
         try:

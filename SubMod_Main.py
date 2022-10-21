@@ -20,14 +20,14 @@ config= {
     'model_name' : 'Simple_CNN',
     'modifiers' : [0.2,0.1,0.5,0.2],
     'learning_rate' : 0.001,
-    'momentum' : 0.9,
+    'momentum' : 0,
     'random_db' : 'True',
     'batch_size' : 50,
     'max_its' : 100,
-    'mod_type' : 'Div_min'
+    'mod_type' : 'Div_min_0momentum'
     }
 
-disabled = False
+disabled = True
 
 if __name__ == "__main__":
 
@@ -69,7 +69,10 @@ if __name__ == "__main__":
     loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
     #Optimizer
-    optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'],momentum=config['momentum'])
+    if config['momentum'] == 0:
+        optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'])
+    else:
+        optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'],momentum=config['momentum'])
 
     #Metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -85,8 +88,7 @@ if __name__ == "__main__":
 
     #Wandb
     sf.wandb_setup(config,disabled)
-    logging_callback = WandbCallback(log_freq=10,save_model=False)
-
+    logging_callback = WandbCallback(log_freq=1,save_model=False)
 
     #Training
     for b in range(config['max_its']):
@@ -96,8 +98,16 @@ if __name__ == "__main__":
         test_loss.reset_states()
         test_acc_metric.reset_states()
 
-        #Training
         train_DG.get_activations(model)
+        for imgs,labels in train_DG:
+            print(imgs.shape)
+            print(labels.shape)
+            
+            train_step(imgs,labels)
+            pnt()
+
+        #Training
+        if config['mod_type'] != 'Random': train_DG.get_activations(model)
         model.fit(train_DG,epochs=1,callbacks= [logging_callback])
         #print(hist.history['accuracy'])
         train_DG.on_epoch_end()
@@ -107,21 +117,6 @@ if __name__ == "__main__":
             label = tf.one_hot(label,num_classes)
             test_step(img,label)
         wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()})
-        '''
-        #Logging
-        if b % 20 == 0 and not disabled:
-            wandb.log({'batch_num': b,
-                    'train_loss': hist.history['loss'][0],
-                    'train_acc': hist.history['accuracy'][0],
-                    'test_loss': test_loss.result(),
-                    'test_acc': test_acc_metric.result()})
-        elif not disabled:
-            wandb.log({'batch_num': b,
-                    'train_loss': hist.history['loss'][0],
-                    'train_acc': hist.history['accuracy'][0]})
 
-        if b % 100 == 0:
-            wandb.log({'used_images': train_DG.img_count_store})
-        '''
     #Finish
     print('Finished')
