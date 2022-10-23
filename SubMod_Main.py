@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
-#/DBs/
+#DBs/
 config= {
     'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
     'ds_name' : "cifar10",
@@ -23,10 +23,10 @@ config= {
     'momentum' : 0,
     'random_db' : 'True',
     'batch_size' : 50,
-    'max_its' : 100,
+    'max_its' : 60000,
     'mod_type' : 'only_Div_min_0momentum_k1',
-    'test_log_its' : 50,
-    'train_log_its' : 50,
+    'test_log_its' : 25,
+    'train_log_its' : 25,
     }
 
 disabled = False
@@ -106,17 +106,15 @@ if __name__ == "__main__":
         for imgs,labels in train_DG:
             train_step(imgs,labels)
             train_DG.get_activations(model)
-            if b % config['train_log_its'] == 0: wandb.log({'train_loss':train_loss.result(),'train_acc':train_acc_metric.result()},step=b)
+        wandb.log({'train_loss':train_loss.result(),'train_acc':train_acc_metric.result()},step=b)
         train_DG.on_epoch_end()
         
+        #Testing
+        for img, label in test_ds.batch(config['batch_size']):
+            label = tf.one_hot(label,num_classes)
+            test_step(img,label)
         
-        if b % config['test_log_its'] == 0:
-            #Testing
-            for img, label in test_ds.batch(config['batch_size']):
-                label = tf.one_hot(label,num_classes)
-                test_step(img,label)
-            
-            wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=b)
+        wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=b)
 
     #Finish
     print('Finished')

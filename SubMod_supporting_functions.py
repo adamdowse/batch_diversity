@@ -59,9 +59,10 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #called at the end of each epoch
         #reset the indexes
         self.indexes = np.arange(self.num_images, dtype=int)
+        print("epoch ended")
 
     def __getitem__(self, index):
-        print("index length = ", len(self.indexes))
+        #print("index length = ", len(self.indexes))
         #gets the next batch of data
         #build a batch via submodular selection
         #calculate the scores for each image
@@ -79,21 +80,25 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.img_count_store[self.set_indexes] += 1
 
         #pull the data from the database
-        try:
-            conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
-        except Error as e:
-            print(e)
-        curr = conn.cursor()
-        imgs = []
-        labels = []
+        #try:
+        #    conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
+        #except Error as e:
+        #    print(e)
+        #curr = conn.cursor()
+        #imgs = []
+        #labels = []
 
-        for bi in self.set_indexes:
-            curr.execute('SELECT data, label_num FROM imgs WHERE id = (?)', (int(bi+1),))
-            data = curr.fetchall()[0]
-            imgs.append(data[0])
-            labels.append(data[1])
+        #for bi in self.set_indexes:
+        #    curr.execute('SELECT data, label_num FROM imgs WHERE id = (?)', (int(bi+1),))
+        #    data = curr.fetchall()[0]
+        #    imgs.append(data[0])
+        #    labels.append(data[1])
 
-        conn.close()
+        #conn.close()
+
+        imgs = self.imgs[self.set_indexes]
+        labels = self.labels[self.set_indexes]
+
         self.set_indexes = np.array([],dtype=int)
         
         #convert to tensors
@@ -202,15 +207,20 @@ class SubModDataGen(tf.keras.utils.Sequence):
         except Error as e:
             print(e)
         curr = conn.cursor()
-        curr.execute('''SELECT data FROM imgs''')
+        curr.execute('''SELECT data, label_num FROM imgs''')
         self.imgs = []
-        for self.img in curr:
-            self.imgs.append(self.img)
+        self.labels = []
+        for img, label in curr:
+            self.imgs.append(img)
+            self.labels.append(label)
         conn.close()
+
+        print('imgs shape: ',np.array(self.imgs).shape)
+        print('labels shape: ',np.array(self.labels).shape)
 
         #convert to tensor
         self.imgs = np.array(self.imgs)
-        self.imgs = np.squeeze(self.imgs,axis=1)
+        self.labels = np.array(self.labels)
         
 
     def get_activations(self,model):
@@ -219,19 +229,9 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
         imgs = self.imgs[self.indexes]
         imgs = tf.cast(imgs,'float32')
-        
-        #calculate the ll_activations for all images
-        #run the model on the data so we get last layer activations
-        ll_model = Model(inputs=model.input, outputs=model.get_layer('last_layer').output)
-        ll_activations = ll_model.predict(imgs)
 
-        #run the model on the data so we get the penultimate layer activations
-        pl_model = Model(inputs=model.input, outputs=model.get_layer('penultimate_layer').output)
-        pl_activations = pl_model.predict(imgs)
-
-        #run the model on the data so we get the softmax outputs
-        preds = model.predict(imgs)
-
+        inter_model = Model(inputs=model.input, outputs=[model.get_layer('last_layer').output,model.get_layer('penultimate_layer').output,model.output])
+        ll_activations, pl_activations, preds = inter_model.predict(imgs)
 
         #modify indexes of outputs to maintain the order of the images
         # from [0,2,4] to [n,0,n,0,n,0] ect
