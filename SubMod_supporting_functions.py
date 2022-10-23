@@ -42,6 +42,8 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.on_epoch_end()
         self.set_indexes = np.array([],dtype=int)
 
+        self.get_imgs()
+
         #Logging
         print("Number of classes: ", self.num_classes)
         print("Number of images: ", self.num_images)
@@ -59,6 +61,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.indexes = np.arange(self.num_images, dtype=int)
 
     def __getitem__(self, index):
+        print("index length = ", len(self.indexes))
         #gets the next batch of data
         #build a batch via submodular selection
         #calculate the scores for each image
@@ -186,16 +189,13 @@ class SubModDataGen(tf.keras.utils.Sequence):
             else:
                 #get the index of the image with the highest score
                 max_index = np.argmax(scores)
+
             #add the index to the set
             self.set_indexes = np.append(self.set_indexes,self.indexes[max_index])
             #remove the index from the indexes
             self.indexes = np.delete(self.indexes,max_index)
 
-
-    def get_activations(self,model):
-        #TODO look into using multiprocessing to speed this up
-        
-        #calculate the ll_activations for all images
+    def get_imgs(self):
         #get the data from the database
         try:
             conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
@@ -203,26 +203,45 @@ class SubModDataGen(tf.keras.utils.Sequence):
             print(e)
         curr = conn.cursor()
         curr.execute('''SELECT data FROM imgs''')
-        imgs = []
-        for img in curr:
-            imgs.append(img)
+        self.imgs = []
+        for self.img in curr:
+            self.imgs.append(self.img)
         conn.close()
 
         #convert to tensor
-        imgs = np.array(imgs)
-        imgs = np.squeeze(imgs,axis=1)
-        imgs = tf.cast(imgs,'float32')
+        self.imgs = np.array(self.imgs)
+        self.imgs = np.squeeze(self.imgs,axis=1)
+        
 
+    def get_activations(self,model):
+        #TODO look into using multiprocessing to speed this up
+        #Also for the every batch epoch we dont need all the activations
+
+        imgs = self.imgs[self.indexes]
+        imgs = tf.cast(imgs,'float32')
+        
+        #calculate the ll_activations for all images
         #run the model on the data so we get last layer activations
         ll_model = Model(inputs=model.input, outputs=model.get_layer('last_layer').output)
-        self.ll_activations = ll_model.predict(imgs)
+        ll_activations = ll_model.predict(imgs)
 
         #run the model on the data so we get the penultimate layer activations
         pl_model = Model(inputs=model.input, outputs=model.get_layer('penultimate_layer').output)
-        self.pl_activations = pl_model.predict(imgs)
+        pl_activations = pl_model.predict(imgs)
 
         #run the model on the data so we get the softmax outputs
-        self.preds = model.predict(imgs)
+        preds = model.predict(imgs)
+
+
+        #modify indexes of outputs to maintain the order of the images
+        # from [0,2,4] to [n,0,n,0,n,0] ect
+        self.ll_activations = np.zeros((self.num_images,ll_activations.shape[1]))
+        self.pl_activations = np.zeros((self.num_images,pl_activations.shape[1]))
+        self.preds = np.zeros((self.num_images,preds.shape[1]))
+        for count, idx in enumerate(self.indexes):
+            self.ll_activations[idx] = ll_activations[count]
+            self.pl_activations[idx] = pl_activations[count]
+            self.preds[idx] = preds[count]
 
 
 def setup_db(config):

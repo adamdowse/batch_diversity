@@ -1,6 +1,10 @@
 import numpy as np
-a = 'test'
-b = 'test_hi'
+a = np.array([0,2,4],dtype=int)
 
-if a in b:
-    print('yes')
+preds = [0,0,0,0,0]
+b = [10,11,12]
+for count, i in enumerate(a):
+    preds[i] = b[count]
+print(np.zeros((2,5)))
+
+

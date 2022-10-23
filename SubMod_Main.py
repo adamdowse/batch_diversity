@@ -24,7 +24,9 @@ config= {
     'random_db' : 'True',
     'batch_size' : 50,
     'max_its' : 100,
-    'mod_type' : 'Div_min_0momentum'
+    'mod_type' : 'only_Div_min_0momentum_k1',
+    'test_log_its' : 50,
+    'train_log_its' : 50,
     }
 
 disabled = False
@@ -91,6 +93,7 @@ if __name__ == "__main__":
     logging_callback = WandbCallback(log_freq=1,save_model=False)
 
     #Training
+    b_count = 0
     for b in range(config['max_its']):
         #Reset the metrics at the start of the next batch
         train_loss.reset_states()
@@ -98,25 +101,22 @@ if __name__ == "__main__":
         test_loss.reset_states()
         test_acc_metric.reset_states()
 
+        #Training
         train_DG.get_activations(model)
         for imgs,labels in train_DG:
-            print(imgs.shape)
-            print(labels.shape)
-            
             train_step(imgs,labels)
-            pnt()
-
-        #Training
-        if config['mod_type'] != 'Random': train_DG.get_activations(model)
-        model.fit(train_DG,epochs=1,callbacks= [logging_callback])
-        #print(hist.history['accuracy'])
+            train_DG.get_activations(model)
+            if b % config['train_log_its'] == 0: wandb.log({'train_loss':train_loss.result(),'train_acc':train_acc_metric.result()},step=b)
         train_DG.on_epoch_end()
         
-        #Testing
-        for img, label in test_ds.batch(config['batch_size']):
-            label = tf.one_hot(label,num_classes)
-            test_step(img,label)
-        wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()})
+        
+        if b % config['test_log_its'] == 0:
+            #Testing
+            for img, label in test_ds.batch(config['batch_size']):
+                label = tf.one_hot(label,num_classes)
+                test_step(img,label)
+            
+            wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=b)
 
     #Finish
     print('Finished')
