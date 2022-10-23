@@ -106,7 +106,7 @@ if __name__ == "__main__":
         for imgs,labels in train_DG:
             train_step(imgs,labels)
             train_DG.get_activations(model)
-        wandb.log({'train_loss':train_loss.result(),'train_acc':train_acc_metric.result()},step=b)
+        wandb.log({'loss':train_loss.result(),'accuracy':train_acc_metric.result()},step=b)
         train_DG.on_epoch_end()
         
         #Testing
