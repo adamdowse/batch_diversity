@@ -12,24 +12,24 @@ import matplotlib.pyplot as plt
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
 #DBs/
 config= {
-    'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+    'db_path' : "DBs/",
     'ds_name' : "cifar10",
     'train_percent' : 0.1,
     'test_percent' : 0.1,
     'group' : 't7_SubMod',
-    'model_name' : 'Simple_CNN',
+    'model_name' : 'AlexNet',
     'modifiers' : [0,1,0,0],
     'learning_rate' : 0.001,
     'momentum' : 0,
     'random_db' : 'True',
     'batch_size' : 50,
-    'max_its' : 60000,
+    'max_its' : 300,
     'mod_type' : 'only_Div_min_0momentum_k1',
     'test_log_its' : 25,
     'train_log_its' : 25,
     }
 
-disabled = False
+disabled = True
 
 if __name__ == "__main__":
 
@@ -93,7 +93,6 @@ if __name__ == "__main__":
     logging_callback = WandbCallback(log_freq=1,save_model=False)
 
     #Training
-    b_count = 0
     for b in range(config['max_its']):
         #Reset the metrics at the start of the next batch
         train_loss.reset_states()
@@ -103,10 +102,14 @@ if __name__ == "__main__":
 
         #Training
         train_DG.get_activations(model)
+        b_count = 0
         for imgs,labels in train_DG:
             train_step(imgs,labels)
             train_DG.get_activations(model)
-        wandb.log({'loss':train_loss.result(),'accuracy':train_acc_metric.result()},step=b)
+            b_count += 1
+            if b_count == int((num_train_imgs * 2) / config['batch_size']):
+                wandb.log({'loss':train_loss.result(),'accuracy':train_acc_metric.result()},step=b*2)
+        wandb.log({'loss':train_loss.result(),'accuracy':train_acc_metric.result()},step=2*b + 1)
         train_DG.on_epoch_end()
         
         #Testing
@@ -114,7 +117,7 @@ if __name__ == "__main__":
             label = tf.one_hot(label,num_classes)
             test_step(img,label)
         
-        wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=b)
+        wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=2* b +1)
 
     #Finish
     print('Finished')
