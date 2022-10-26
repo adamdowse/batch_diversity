@@ -13,11 +13,12 @@ from scipy.spatial.distance import cdist
 import random
 import os
 import wandb
+import matplotlib.pyplot as plt
 
 #The train data generator
 class SubModDataGen(tf.keras.utils.Sequence):
     #This Generator is used to generate batches of data for the training of the model via submodular selection
-    def __init__(self, db_path, batch_size, modifiers,mod_type):
+    def __init__(self, db_path, batch_size, modifiers,mod_type,config):
         #INIT:
         #conn: the connection to the database
         #batch_size: the size of the batch to use
@@ -25,6 +26,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         print("Starting SubMod Data Generator")
 
         #init db connection and init vars
+        self.config = config
         self.db_path = db_path
         self.mod_type = mod_type
         self.batch_size = batch_size
@@ -50,10 +52,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
         print("Batch size: ", self.batch_size)
         print("Number of batches: ", self.num_batches)
 
-        
-        
-    def ret_batch_info(self):
-        return self.num_batches
 
     def on_epoch_end(self):
         #called at the end of each epoch
@@ -66,7 +64,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #gets the next batch of data
         #build a batch via submodular selection
         #calculate the scores for each image
-        if self.mod_type == 'random':
+        if self.mod_type in ['Random','random']:
             choices = np.random.randint(0,len(self.indexes),self.batch_size)
             #add the index to the set
             self.set_indexes = self.indexes[choices]
@@ -79,32 +77,17 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #update what images have been used in batches
         self.img_count_store[self.set_indexes] += 1
 
-        #pull the data from the database
-        #try:
-        #    conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
-        #except Error as e:
-        #    print(e)
-        #curr = conn.cursor()
-        #imgs = []
-        #labels = []
-
-        #for bi in self.set_indexes:
-        #    curr.execute('SELECT data, label_num FROM imgs WHERE id = (?)', (int(bi+1),))
-        #    data = curr.fetchall()[0]
-        #    imgs.append(data[0])
-        #    labels.append(data[1])
-
-        #conn.close()
-
+        #get the data for the batch
         imgs = self.imgs[self.set_indexes]
         labels = self.labels[self.set_indexes]
 
-        self.set_indexes = np.array([],dtype=int)
-        
         #convert to tensors
         imgs = tf.cast(np.array(imgs),'float32')
         labels = tf.one_hot(np.array(labels),self.num_classes)
 
+        #reset the set indexes
+        self.set_indexes = np.array([],dtype=int)
+        
         return (imgs, labels,)
 
     def __len__(self):
@@ -218,7 +201,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         print('imgs shape: ',np.array(self.imgs).shape)
         print('labels shape: ',np.array(self.labels).shape)
 
-        #convert to tensor
+        #convert to numoy arrays
         self.imgs = np.array(self.imgs)
         self.labels = np.array(self.labels)
         
@@ -226,22 +209,45 @@ class SubModDataGen(tf.keras.utils.Sequence):
     def get_activations(self,model):
         #TODO look into using multiprocessing to speed this up
         #Also for the every batch epoch we dont need all the activations
+        if self.config['mod_type'] not in ['Random','random']:
+            imgs = self.imgs[self.indexes]
+            imgs = tf.cast(imgs,'float32')
 
-        imgs = self.imgs[self.indexes]
-        imgs = tf.cast(imgs,'float32')
+            inter_model = Model(inputs=model.input, outputs=[model.get_layer('last_layer').output,model.get_layer('penultimate_layer').output,model.output])
+            ll_activations, pl_activations, preds = inter_model.predict(imgs)
 
-        inter_model = Model(inputs=model.input, outputs=[model.get_layer('last_layer').output,model.get_layer('penultimate_layer').output,model.output])
-        ll_activations, pl_activations, preds = inter_model.predict(imgs)
+            #modify indexes of outputs to maintain the order of the images
+            # from [0,2,4] to [n,0,n,0,n,0] ect
+            self.ll_activations = np.zeros((self.num_images,ll_activations.shape[1]))
+            self.pl_activations = np.zeros((self.num_images,pl_activations.shape[1]))
+            self.preds = np.zeros((self.num_images,preds.shape[1]))
+            for count, idx in enumerate(self.indexes):
+                self.ll_activations[idx] = ll_activations[count]
+                self.pl_activations[idx] = pl_activations[count]
+                self.preds[idx] = preds[count]
 
-        #modify indexes of outputs to maintain the order of the images
-        # from [0,2,4] to [n,0,n,0,n,0] ect
-        self.ll_activations = np.zeros((self.num_images,ll_activations.shape[1]))
-        self.pl_activations = np.zeros((self.num_images,pl_activations.shape[1]))
-        self.preds = np.zeros((self.num_images,preds.shape[1]))
-        for count, idx in enumerate(self.indexes):
-            self.ll_activations[idx] = ll_activations[count]
-            self.pl_activations[idx] = pl_activations[count]
-            self.preds[idx] = preds[count]
+    def record_losses(self,model,config):
+        #record the losses for the model into a histogram
+        losses = []
+        i = 0
+        for img,label in zip(self.imgs,self.labels):
+            i += 1
+            if i % 1000 == 0: print(i)
+            img = np.expand_dims(img,axis=0)
+            img = tf.cast(img,'float32')
+            label = np.expand_dims(label,axis=0)
+            label = tf.one_hot(label,self.num_classes)
+            loss = model.test_on_batch(img,label,reset_metrics=True)
+            losses.append(loss[0])
+        
+        #print('losses shape: ',losses.shape)
+        #plot a histogram of the losses
+        #plt.hist(losses,bins=100)
+        #plt.title('Losses')
+        #plt.xlabel('Loss')
+        #plt.ylabel('Frequency')
+        #plt.savefig(config['mod_type']+'_'+config['ds_name']+'_'+config['model_name']+'_lossesHist.png')
+        return losses
 
 
 def setup_db(config):

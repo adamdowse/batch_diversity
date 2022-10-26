@@ -48,8 +48,21 @@ def AlexNet (num_classes,in_shape):
     ])
     return model
 
+def EfficientNetV2B0_pretrained(num_classes,in_shape):
+    model = tf.keras.Sequential([
+        tf.keras.applications.EfficientNetV2B0(include_top=False,weights='imagenet',input_shape=in_shape,classifier_activation='None'),
+        layers.Flatten(),
+        layers.Dense(100,activation='relu',name="penultimate_layer"),
+        layers.Dense(num_classes,name="last_layer"),
+        layers.Softmax()
+    ])
+    return model
+
+
 def select_model(model_name,num_classes,img_shape):
     if model_name == 'Simple_CNN':
         return Simple_CNN(num_classes,img_shape)
     if model_name == 'AlexNet':
         return AlexNet(num_classes,img_shape)
+    if model_name == 'EfficientNetV2B0_pretrained':
+        return EfficientNetV2B0_pretrained(num_classes,img_shape)

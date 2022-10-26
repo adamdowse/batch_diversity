@@ -16,20 +16,20 @@ config= {
     'ds_name' : "cifar10",
     'train_percent' : 0.1,
     'test_percent' : 0.1,
-    'group' : 't7_SubMod',
-    'model_name' : 'AlexNet',
+    'group' : 't8_pretrained',
+    'model_name' : 'EfficientNetV2B0_pretrained',
     'modifiers' : [0,1,0,0],
     'learning_rate' : 0.001,
     'momentum' : 0,
     'random_db' : 'True',
     'batch_size' : 50,
     'max_its' : 300,
-    'mod_type' : 'only_Div_min_0momentum_k1',
-    'test_log_its' : 25,
+    'mod_type' : 'Div_min_k1',
+    'test_log_its' : 5,
     'train_log_its' : 25,
     }
 
-disabled = True
+disabled = False
 
 if __name__ == "__main__":
 
@@ -69,6 +69,7 @@ if __name__ == "__main__":
 
     #Loss
     loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
+    no_red_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False, reduction=tf.keras.losses.Reduction.NONE)
 
     #Optimizer
     if config['momentum'] == 0:
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     test_acc_metric = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
 
     #Data Generator
-    train_DG = sf.SubModDataGen(conn_path,config['batch_size'],config['modifiers'],config['mod_type'])
+    train_DG = sf.SubModDataGen(conn_path,config['batch_size'],config['modifiers'],config['mod_type'],config)
 
     #Compile Model
     model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy','mse'])
@@ -99,6 +100,10 @@ if __name__ == "__main__":
         train_acc_metric.reset_states()
         test_loss.reset_states()
         test_acc_metric.reset_states()
+
+        #record losses from pretrained model
+        if b % config['test_log_its'] == 0:
+            wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.record_losses(model,config))},step=b*2)
 
         #Training
         train_DG.get_activations(model)
