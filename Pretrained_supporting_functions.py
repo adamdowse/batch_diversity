@@ -16,21 +16,38 @@ import os
 import wandb
 import matplotlib.pyplot as plt
 
+#the test data gen
+class TestDataGen(tf.keras.utils.Sequence):
+    def __init__(self, test_ds, batch_size,num_classes):
+        self.test_ds = test_ds.batch(batch_size)
+        self.batch_size = batch_size
+        self.num_classes = num_classes
+
+        self.imgs = []
+        self.labels = []
+        self.num_batches = 0
+        for imgs, labels in self.test_ds:
+            self.num_batches += 1
+            self.imgs.append(imgs)
+            self.labels.append(tf.one_hot(labels, self.num_classes))
+        
+    def __getitem__(self, index):
+        return (self.imgs[index], self.labels[index],)
+    
+    def __len__(self):
+        return self.num_batches
+
 #The train data generator
 class SubModDataGen(tf.keras.utils.Sequence):
     #This Generator is used to generate batches of data for the training of the model via submodular selection
-    def __init__(self, config):
-        #INIT:
-        #conn: the connection to the database
-        #batch_size: the size of the batch to use
-
+    def __init__(self, conn_path, config):
         print("Starting SubMod Data Generator")
-
         #init db connection and init vars
         self.config = config
+        self.conn_path = conn_path
 
         try:
-            conn = sqlite3.connect(self.config['db_path'],detect_types=sqlite3.PARSE_DECLTYPES)
+            conn = sqlite3.connect(self.conn_path,detect_types=sqlite3.PARSE_DECLTYPES)
         except Error as e:
             print(e)
         curr = conn.cursor()
@@ -38,8 +55,10 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.num_images = curr.execute('''SELECT COUNT(id) FROM imgs''').fetchone()[0]
         conn.close()
 
+        self.data_used = np.zeros(self.num_images,dtype=int)
+
         #get the data #TODO this is a hack to get the data
-        self.get_imgs()
+        self.__get_imgs()
 
         #Logging
         print("Number of classes: ", self.num_classes)
@@ -51,7 +70,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #build a batch via submodular selection
 
         #randomly select a batch of images
-        if self.mod_type in ['Random','random']:
+        if self.config['mod_type'] in ['Random','random']:
             choices = np.random.randint(0,len(self.batch_indexes),self.batch_size)
             #add the index to the set
             self.batch_indexes = self.set_indexes[choices]
@@ -59,7 +78,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
             self.set_indexes = np.delete(self.set_indexes,choices)
         else:
             #gets the indexes of the images to use in the next batch and removes them form the set of available images
-            self.get_submod_indexes()
+            self.__get_submod_indexes()
 
         #get the data for the batch
         imgs = self.imgs[self.batch_indexes]
@@ -71,6 +90,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
         #reset the set indexes
         self.batch_indexes = np.array([],dtype=int)
+
         
         return (imgs, labels,)
 
@@ -80,30 +100,31 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
     def get_data_subset(self, model):
         #create a subset of the data to use for submodular selection based on the losses of the entire training set
-        if self.mod_type in ['Random','random']:
-            self.num_batches = int(np.ceil(self.num_images/config['batch_size']))
+        if self.config['mod_type'] in ['Random','random']:
+            self.num_batches = int(np.ceil(self.num_images/self.config['batch_size']))
             
         else:
             #score all images with loss and keep activations from the top k % of images
             #get losses for all images
-            losses = self.__record_losses(model)
+            self.losses = self.__record_losses(model)
 
             #get the top k % of images TODO this needs to be robust?
-            self.set_indexes = np.argsort(losses)[:int(np.ceil(self.config['k_percent']*len(losses)))]
+            self.set_indexes = np.argsort(self.losses)[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
+            self.data_used[self.set_indexes] += 1
 
             #get the number of batches for the subset
-            self.num_batches = int(np.ceil(len(self.set_indexes)/self.batch_size))
+            self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
 
             #get the activations for the top k % of images
-            __get_activations(model)
+            self.__get_activations(model)
         
         print('num batches in epoch: ',self.num_batches)
 
     def __record_losses(self,model):
-        #record the losses for the model into a histogram
+        #record the losses for the model into a histogram TODO this needs to be better
         losses = []
         i = 0
-        print('updating train losses')
+        print('Updating train losses')
         for img,label in zip(self.imgs,self.labels):
             i += 1
             if i % 1000 == 0: print(i)
@@ -134,21 +155,22 @@ class SubModDataGen(tf.keras.utils.Sequence):
                 #calculate the mean of the batch activations
                 batch_mean = np.mean(activations[batch_indexes],axis=0)
                 #TODO ensure this is the right shape
-                return 1/np.min(cdist(batch_mean,pl_activations[set_indexes]),axis=0)
+                return 1/np.min(cdist([batch_mean],activations[set_indexes]),axis=0)
             else:
                 return np.zeros(len(set_indexes))
 
         #get the indexes of the images to use in the next batch
-        if len(self.indexes) < self.batch_size: 
+        if len(self.set_indexes) < self.config['batch_size']: 
             self.batch_indexes = self.set_indexes
         else: 
             #k-means++ clustering
             #cluster_indexes = sklearn.cluster.KMeans(n_clusters=self.num_batches,init='k-means++').fit_predict(self.activations)
 
-            for i in range(self.batch_size):
+            for i in range(self.config['batch_size']):
                 #calculate the scores for each image in subset and normalize
-                mean_dist_score = Dist_To_Mean_Score(self.activations,self.indexes)
-                scores = Norm(mean_dist_score)
+                scores = Dist_To_Mean_Score(self.activations,self.set_indexes,self.batch_indexes)
+
+                #scores = Norm(mean_dist_score)
                 
                 #if the sum of the scores is 0, then select a random image
                 if np.sum(scores) == 0:
@@ -163,11 +185,14 @@ class SubModDataGen(tf.keras.utils.Sequence):
                 self.batch_indexes = np.append(self.batch_indexes,self.set_indexes[max_index])
                 #remove the index from the indexes
                 self.set_indexes = np.delete(self.set_indexes,max_index)
+            
+            
+
 
     def __get_imgs(self):
         #get the data from the database
         try:
-            conn = sqlite3.connect(self.db_path,detect_types=sqlite3.PARSE_DECLTYPES)
+            conn = sqlite3.connect(self.conn_path,detect_types=sqlite3.PARSE_DECLTYPES)
         except Error as e:
             print(e)
         curr = conn.cursor()
@@ -193,7 +218,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         imgs = self.imgs[self.set_indexes]
         imgs = tf.cast(imgs,'float32')
 
-        inter_model = Model(inputs=model.input, outputs=model.get_layer(config['activation_layer_name']).output)
+        inter_model = Model(inputs=model.input, outputs=model.get_layer(self.config['activation_layer_name']).output)
         activations= inter_model.predict(imgs)
 
         #modify indexes of outputs to maintain the order of the images
@@ -201,6 +226,8 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.activations = np.zeros((self.num_images,activations.shape[1]))
         for count, idx in enumerate(self.set_indexes):
             self.activations[idx] = activations[count]
+        
+        self.batch_indexes = np.array([],dtype=int)
 
 
 def setup_db(config):

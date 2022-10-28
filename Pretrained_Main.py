@@ -1,4 +1,4 @@
-import SubMod_supporting_functions as sf
+import Pretrained_supporting_functions as sf
 import supporting_models as sm
 import tensorflow as tf
 from tensorflow import keras
@@ -23,8 +23,8 @@ config= {
     'random_db' : 'True',
     'batch_size' : 50,
     'max_its' : 300,
-    'mod_type' : 'Div_min_k1',
-    'k_percent' : 0.1,
+    'mod_type' : 'Div_min_k0.1',
+    'k_percent' : 0.5,
     'activation_layer_name' : 'penultimate_layer',
     'test_log_its' : 5,
     'train_log_its' : 25,
@@ -68,9 +68,10 @@ if __name__ == "__main__":
 
     #Data Generator
     train_DG = sf.SubModDataGen(conn_path,config)
+    test_DG = sf.TestDataGen(test_ds, 50, num_classes)
 
     #Compile Model
-    model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy','mse'])
+    model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy',tf.keras.metrics.Precision(),tf.keras.metrics.Recall()])
 
     #Wandb
     sf.wandb_setup(config,disabled)
@@ -78,31 +79,22 @@ if __name__ == "__main__":
 
     #Training
     for i in range(config['max_its']):
-        #Reset the metrics at the start of the next batch
-        #train_loss.reset_states()
-        #train_acc_metric.reset_states()
-        #test_loss.reset_states()
-        #test_acc_metric.reset_states()
-
         #Scores the training data and decides what to train on
         train_DG.get_data_subset(model)
 
         #Log metrics on selected data
-        wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.record_losses(model,config))},step=i)
+        wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=i)
 
         #Train on the data subset
-        model.fit(train_DG(model),epochs=1,verbose=1,callbacks=[logging_callback])
+        print('Training')
+        model.fit(train_DG,epochs=1,verbose=1,callbacks=[logging_callback])
 
-        #Clean datagen
-        train_DG.on_epoch_end()
 
         #Testing - may have problem with batching and lable shape
-        model.evaluate(test_ds,verbose=1,callbacks=[logging_callback])
-        #for img, label in test_ds.batch(config['batch_size']):
-        #    label = tf.one_hot(label,num_classes)
-        #    test_step(img,label)
-        
-        #wandb.log({'test_loss': test_loss.result(),'test_acc': test_acc_metric.result()},step=2* b +1)
+        print('Evaluating')
+        model.evaluate(test_DG,verbose=1,callbacks=[logging_callback])
 
+
+    wandb.log({'Images_used_hist':wandb.Histogram(train_DG.used_imgs)})
     #Finish
     print('Finished')
