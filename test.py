@@ -1,6 +1,4 @@
 import numpy as np
 
-
-print(6/3)
-print(np.ceil(6/3))
-
+a = 'hi there array '
+print(a in ['there','is'])

@@ -45,6 +45,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #init db connection and init vars
         self.config = config
         self.conn_path = conn_path
+        self.batch_num = 0
 
         try:
             conn = sqlite3.connect(self.conn_path,detect_types=sqlite3.PARSE_DECLTYPES)
@@ -69,16 +70,28 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #gets the next batch of data
         #build a batch via submodular selection
 
+        self.batch_num = index
+
         #randomly select a batch of images
-        if self.config['mod_type'] in ['Random','random']:
-            choices = np.random.randint(0,len(self.batch_indexes),self.batch_size)
+        if self.config['train_type'] in ['Random','random']:
+            if len(self.set_indexes) < self.config['batch_size']:
+                #if there are not enough images left in the set, use all the images
+                choices = np.arrange(self.set_indexes)
+            else:
+                #randomly select a batch of images
+                choices = np.random.randint(0,len(self.set_indexes),self.config['batch_size'])
+
             #add the index to the set
             self.batch_indexes = self.set_indexes[choices]
             #remove the index from the indexes
             self.set_indexes = np.delete(self.set_indexes,choices)
-        else:
+        elif self.config['train_type'] in ['Submodular','submodular','SubModular','subModular','SubMod','subMod','Submod']:
             #gets the indexes of the images to use in the next batch and removes them form the set of available images
+            self.batch_indexes = np.array([],dtype=int)
             self.__get_submod_indexes()
+        
+        else:
+            print('ERROR: Invalid train type')
 
         #get the data for the batch
         imgs = self.imgs[self.batch_indexes]
@@ -91,7 +104,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #reset the set indexes
         self.batch_indexes = np.array([],dtype=int)
 
-        
         return (imgs, labels,)
 
     def __len__(self):
@@ -99,24 +111,36 @@ class SubModDataGen(tf.keras.utils.Sequence):
         return self.num_batches
 
     def get_data_subset(self, model):
-        #create a subset of the data to use for submodular selection based on the losses of the entire training set
-        if self.config['mod_type'] in ['Random','random']:
+        #create a subset of the data to use for training
+        if self.config['subset_type'] in ['All','all']:
+            #Use all the data
+            print('No hard mining, full epoch used')
+            self.set_indexes = np.arange(self.num_images)
+            self.data_used += 1
             self.num_batches = int(np.ceil(self.num_images/self.config['batch_size']))
+            self.losses = np.zeros(self.num_images)
+
             
-        else:
+        elif self.config['subset_type'] in ['HM','hard_mining','Hard_Mining','Hard_mining']:
             #score all images with loss and keep activations from the top k % of images
+            print("Hard mining")
             #get losses for all images
             self.losses = self.__record_losses(model)
 
             #get the top k % of images TODO this needs to be robust?
             self.set_indexes = np.argsort(self.losses)[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
             self.data_used[self.set_indexes] += 1
-
-            #get the number of batches for the subset
+        
+        elif self.config['subset_type'] in ['Random_Bucket','random_bucket','Random_bucket'] :
+            #select a random bucket of images from the full set
+            print("Random Bucket")
+            self.set_indexes = np.random.randint(0,self.num_images,int(np.ceil(self.config['k_percent']*self.num_images)))
+            self.data_used[self.set_indexes] += 1
             self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
-
-            #get the activations for the top k % of images
-            self.__get_activations(model)
+            self.losses = np.zeros(self.num_images)
+            
+        else:
+            print('ERRORL: Invalid subset type')
         
         print('num batches in epoch: ',self.num_batches)
 
@@ -124,7 +148,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #record the losses for the model into a histogram TODO this needs to be better
         losses = []
         i = 0
-        print('Updating train losses')
+        
         for img,label in zip(self.imgs,self.labels):
             i += 1
             if i % 1000 == 0: print(i)
@@ -186,9 +210,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
                 #remove the index from the indexes
                 self.set_indexes = np.delete(self.set_indexes,max_index)
             
-            
-
-
     def __get_imgs(self):
         #get the data from the database
         try:
@@ -211,23 +232,28 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.imgs = np.array(self.imgs)
         self.labels = np.array(self.labels)
         
-    def __get_activations(self,model):
+    def get_activations(self,model,batch_num):
         #TODO look into using multiprocessing to speed this up
         #Also for the every batch epoch we dont need all the activations
         #get the activations of the model for each image in the subset so that the subset_index aligns with activations
-        imgs = self.imgs[self.set_indexes]
-        imgs = tf.cast(imgs,'float32')
+        if self.config['train_type'] in ['Random','random']:
+            print('No activations needed')
+        else:
+            if batch_num % self.config['activations_delay'] == 0:
+                imgs = self.imgs[self.set_indexes]
+                imgs = tf.cast(imgs,'float32')
+            
+                inter_model = Model(inputs=model.input, outputs=model.get_layer(self.config['activation_layer_name']).output)
+                activations = inter_model.predict(imgs,batch_size = 128)
+                del inter_model
 
-        inter_model = Model(inputs=model.input, outputs=model.get_layer(self.config['activation_layer_name']).output)
-        activations= inter_model.predict(imgs)
-
-        #modify indexes of outputs to maintain the order of the images
-        # from [0,2,4] to [n,0,n,0,n,0] ect
-        self.activations = np.zeros((self.num_images,activations.shape[1]))
-        for count, idx in enumerate(self.set_indexes):
-            self.activations[idx] = activations[count]
+                #modify indexes of outputs to maintain the order of the images
+                # from [0,2,4] to [n,0,n,0,n,0] ect
+                self.activations = np.zeros((self.num_images,activations.shape[1]))
+                for count, idx in enumerate(self.set_indexes):
+                    self.activations[idx] = activations[count]
         
-        self.batch_indexes = np.array([],dtype=int)
+
 
 
 def setup_db(config):
@@ -309,7 +335,7 @@ def setup_db(config):
 
     conn.commit()
     conn.close()
-    return test_ds, ds_info, conn_path
+    return test_ds, ds_info, conn_path, train_ds
 
 def wandb_setup(config,disabled):
     #Setup logs and records
