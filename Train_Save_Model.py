@@ -20,9 +20,9 @@ sweep_configuration = {
         'name': 'val_accuracy'
 		},
     'parameters': {
-        'batch_size': {'values': [32,64,128,256]},
+        'batch_size': {'values': [64,128,256]},
         'lr': {'values': [0.1,0.01,0.001,0.0001]},
-        'momentum': {'values': [0,0.5,0.99]},
+        'momentum': {'values': [0,0.99]},
      }
 }
 
@@ -42,6 +42,9 @@ def main():
     data_shape = train_info.features['image'].shape
     data_classes = train_info.features['label'].num_classes
     train_ds = train_ds.batch(wandb.config.batch_size).map(lambda x, y: (x, tf.one_hot(y, depth=data_classes)))
+    train_ds = train_ds.map(lambda image, label: (tf.image.random_flip_left_right(image), label))
+    train_ds = train_ds.map(lambda image, label: (tf.image.random_contrast(image, lower=0.0, upper=1.0), label)).shuffle(1000)
+    
     test_ds = test_ds.batch(wandb.config.batch_size).map(lambda x, y: (x, tf.one_hot(y, depth=data_classes)))
 
     #get model
@@ -50,7 +53,7 @@ def main():
     model.summary()
 
     #compile model
-    optimizer = tf.keras.optimizers.SGD(learning_rate=wandb.config.lr, momentum=wandb.config.momentum)#
+    optimizer = tf.keras.optimizers.SGD(learning_rate=wandb.config.lr, momentum=wandb.config.momentum)
     loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
     model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy',tf.keras.metrics.Precision(),tf.keras.metrics.Recall()])
 
