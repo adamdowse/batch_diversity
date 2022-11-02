@@ -35,8 +35,8 @@ def main():
     config= {
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'train_percent' : 0.1,
-        'test_percent' : 0.1,
+        'train_percent' : 1,
+        'test_percent' : 1,
         'group' : 't9_hyperparam_search',
         'model_name' : 'Simple_CNN',
         'learning_rate' : wandb.config.lr,
@@ -49,7 +49,7 @@ def main():
         'subset_type' : wandb.config.run_type[0], #Random_Bucket, Hard_Mining, All
         'train_type' : wandb.config.run_type[1], #SubMod, Random
         'activations_delay' : wandb.config.activations_delay, #cannot be 0
-        'k_percent' : wandb.config.k_percent, #percent of data to use for RB and HM
+        'k_percent' : 1, #percent of data to use for RB and HM
         'activation_layer_name' : 'penultimate_layer',
     }
 
@@ -108,7 +108,7 @@ def main():
 
         #Scores the training data and decides what to train on
         print('Getting Subset')
-        train_DG.get_data_subset(model)
+        train_DG.get_data_subset(model,train_ds)
         wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
 
         #Train on the data subset
@@ -136,7 +136,6 @@ def main():
 
 
 if __name__ == "__main__":
-    '''
     sweep_configuration = {
         'method': 'random',
         'name': 'sweep',
@@ -145,22 +144,18 @@ if __name__ == "__main__":
             'name': 'Test_acc'
             },
         'parameters': {
-            'batch_size': {'values': [32,64,128,256]},
-            'lr': {'values': [0.1,0.01,0.001,0.0001]},
-            'momentum': {'values': [0,0.5,0.99]},
-            'run_type': {'values': [['All','Random'],['All','SubMod'],['Random_Bucket','SubMod'],['Hard_Mining','SubMod'],['Hard_Mining','Random']]},
+            'batch_size': {'values': [16,32,64,128,256]},
+            'lr': {'values': [0.001,0.0001,0.00001]},
+            'momentum': {'distribution': 'uniform', 'min' : 0, 'max' : 1},
+            'run_type': {'values': [['All','Random'],['All','SubMod']]}, #,['Hard_Mining','SubMod'],['Hard_Mining','Random']
             'activations_delay': {'values': [1,2,4,8,16,32,64,128]},
-            'k_percent': {'values': [0.1,0.2,0.3,0.4,0.5,0.6,0.7]},
             }
         }
 
-    
-
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    '''
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
-    wandb.agent('adamdowse/k_diversity/0xrld1nf', function=main, count=1)
+    #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
+    wandb.agent('adamdowse/k_diversity/gpzxiyzz', function=main, count=1)
 
 
 

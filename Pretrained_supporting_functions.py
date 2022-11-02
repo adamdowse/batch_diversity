@@ -141,22 +141,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
         
         print('num batches in epoch: ',self.num_batches)
 
-    def __record_losses(self,model):
-        #record the losses for the model into a histogram TODO this needs to be better
-        losses = []
-        i = 0
-        
-        for img,label in zip(self.imgs,self.labels):
-            i += 1
-            if i % 1000 == 0: print(i)
-            img = np.expand_dims(img,axis=0)
-            img = tf.cast(img,'float32')
-            label = np.expand_dims(label,axis=0)
-            label = tf.one_hot(label,self.num_classes)
-            loss = model.test_on_batch(img,label,reset_metrics=True)
-            losses.append(loss[0])
-        return losses
-
     def __get_submod_indexes(self):
 
         def Norm(A):
@@ -229,11 +213,29 @@ class SubModDataGen(tf.keras.utils.Sequence):
         self.imgs = np.array(self.imgs)
         self.labels = np.array(self.labels)
         
+    def __record_losses(self,model,train_ds):
+        #record the losses for the model into a histogram TODO this needs to be better
+        @tf.function
+        def loss_step(x,y):
+            with tf.GradientTape() as tape:
+                pred = model(x)
+                loss = loss_func_no(y,pred)
+            return loss
+
+        print('recording losses')
+        loss_func_no = keras.losses.CategoricalCrossentropy(from_logits=False, reduction=tf.keras.losses.Reduction.NONE)
+        losses = np.array([])
+
+        for x,y in train_ds.batch(128).map(lambda x, y: (x, tf.one_hot(y, depth=self.num_classes))):
+            losses = np.append(losses,loss_step(x,y).numpy())
+
+        return losses
+
     def get_activations(self,model,batch_num):
         #TODO look into using multiprocessing to speed this up
         #Also for the every batch epoch we dont need all the activations
         #get the activations of the model for each image in the subset so that the subset_index aligns with activations
-        if (self.config['train_type'] in ['Random','random']) or (batch_num % self.config['activations_delay'] == 0):
+        if (self.config['train_type'] in ['Random','random']) or (batch_num % self.config['activations_delay'] != 0):
             print('No activations needed')
         else:
             imgs = self.imgs[self.set_indexes]
