@@ -107,7 +107,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #calculates the number of batches to use
         return self.num_batches
 
-    def get_data_subset(self, model):
+    def get_data_subset(self, model,train_ds):
         #create a subset of the data to use for training
         if self.config['subset_type'] in ['All','all']:
             #Use all the data
@@ -121,7 +121,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
             #score all images with loss and keep activations from the top k % of images
             print("Hard mining")
             #get losses for all images
-            self.losses = self.__record_losses(model)
+            self.losses = self.__record_losses(model,train_ds)
 
             #get the top k % of images TODO this needs to be robust?
             self.set_indexes = np.argsort(self.losses)[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
