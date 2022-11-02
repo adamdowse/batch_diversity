@@ -45,7 +45,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #init db connection and init vars
         self.config = config
         self.conn_path = conn_path
-        self.batch_num = 0
 
         try:
             conn = sqlite3.connect(self.conn_path,detect_types=sqlite3.PARSE_DECLTYPES)
@@ -69,8 +68,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
     def __getitem__(self, index):
         #gets the next batch of data
         #build a batch via submodular selection
-
-        self.batch_num = index
 
         #randomly select a batch of images
         if self.config['train_type'] in ['Random','random']:
@@ -236,22 +233,21 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #TODO look into using multiprocessing to speed this up
         #Also for the every batch epoch we dont need all the activations
         #get the activations of the model for each image in the subset so that the subset_index aligns with activations
-        if self.config['train_type'] in ['Random','random']:
+        if (self.config['train_type'] in ['Random','random']) or (batch_num % self.config['activations_delay'] == 0):
             print('No activations needed')
         else:
-            if batch_num % self.config['activations_delay'] == 0:
-                imgs = self.imgs[self.set_indexes]
-                imgs = tf.cast(imgs,'float32')
-            
-                inter_model = Model(inputs=model.input, outputs=model.get_layer(self.config['activation_layer_name']).output)
-                activations = inter_model.predict(imgs,batch_size = 128)
-                del inter_model
+            imgs = self.imgs[self.set_indexes]
+            imgs = tf.cast(imgs,'float32')
+        
+            inter_model = Model(inputs=model.input, outputs=model.get_layer(self.config['activation_layer_name']).output)
+            activations = inter_model.predict(imgs,batch_size = 128)
+            del inter_model
 
-                #modify indexes of outputs to maintain the order of the images
-                # from [0,2,4] to [n,0,n,0,n,0] ect
-                self.activations = np.zeros((self.num_images,activations.shape[1]))
-                for count, idx in enumerate(self.set_indexes):
-                    self.activations[idx] = activations[count]
+            #modify indexes of outputs to maintain the order of the images
+            # from [0,2,4] to [n,0,n,0,n,0] ect
+            self.activations = np.zeros((self.num_images,activations.shape[1]))
+            for count, idx in enumerate(self.set_indexes):
+                self.activations[idx] = activations[count]
         
 
 

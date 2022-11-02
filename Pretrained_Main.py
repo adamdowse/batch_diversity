@@ -107,10 +107,12 @@ def main():
         train_rec_metric.reset_states()
 
         #Scores the training data and decides what to train on
+        print('Getting Subset')
         train_DG.get_data_subset(model)
         wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
 
         #Train on the data subset
+        print('Training')
         for i in range(train_DG.num_batches):
             #get the activations for the next batch selection
             train_DG.get_activations(model,i)
@@ -118,6 +120,7 @@ def main():
             train_step(batch_data[0],batch_data[1])
         
         #Test on the test data
+        print('Evaluating')
         test_metrics = model.evaluate(test_DG)
 
         #Log metrics
