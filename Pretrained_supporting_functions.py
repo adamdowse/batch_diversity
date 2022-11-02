@@ -120,7 +120,6 @@ class SubModDataGen(tf.keras.utils.Sequence):
             self.num_batches = int(np.ceil(self.num_images/self.config['batch_size']))
             self.losses = np.zeros(self.num_images)
 
-            
         elif self.config['subset_type'] in ['HM','hard_mining','Hard_Mining','Hard_mining']:
             #score all images with loss and keep activations from the top k % of images
             print("Hard mining")
@@ -129,6 +128,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
 
             #get the top k % of images TODO this needs to be robust?
             self.set_indexes = np.argsort(self.losses)[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
+            self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
             self.data_used[self.set_indexes] += 1
         
         elif self.config['subset_type'] in ['Random_Bucket','random_bucket','Random_bucket'] :

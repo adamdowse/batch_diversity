@@ -8,32 +8,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import tracemalloc
+import os
 
 
 #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
 #DBs/
 
-@tf.function
-def train_step(imgs,labels):
-    with tf.GradientTape() as tape:
-        preds = model(imgs,training=True)
-        loss = loss_func(labels,preds)
-    grads = tape.gradient(loss,model.trainable_variables)
-    optimizer.apply_gradients(zip(grads,model.trainable_variables))
-    train_loss(loss)
-    train_acc_metric(labels,preds)
-    train_prec_metric(labels,preds)
-    train_rec_metric(labels,preds)
-    return
+
 
 def main():
+
+    @tf.function
+    def train_step(imgs,labels):
+        with tf.GradientTape() as tape:
+            preds = model(imgs,training=True)
+            loss = loss_func(labels,preds)
+        grads = tape.gradient(loss,model.trainable_variables)
+        optimizer.apply_gradients(zip(grads,model.trainable_variables))
+        train_loss(loss)
+        train_acc_metric(labels,preds)
+        train_prec_metric(labels,preds)
+        train_rec_metric(labels,preds)
+        return
+
+    wandb.init(project='k_diversity',entity='adamdowse')
     config= {
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'group' : 't9_hyperparam_search',
-        'model_name' : 'SimpleCNN',
+        'model_name' : 'Simple_CNN',
         'learning_rate' : wandb.config.lr,
         'momentum' : wandb.config.momentum,
         'random_db' : 'True',
@@ -88,7 +93,6 @@ def main():
 
     #Wandb
     #sf.wandb_setup(config,disabled)
-    wandb.init(project='k_diversity',entity='adamdowse',config=config,group=config['group'])
     logging_callback = WandbCallback(log_freq=1,save_model=False,save_code=False)
 
     #Training
@@ -129,6 +133,7 @@ def main():
 
 
 if __name__ == "__main__":
+    '''
     sweep_configuration = {
         'method': 'random',
         'name': 'sweep',
@@ -146,11 +151,14 @@ if __name__ == "__main__":
             }
         }
 
-    os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
-    if disabled:
-        os.environ['WANDB_DISABLED'] = 'true'
-    wandb.login()
+    
 
     sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    wandb.agent(sweep_id, function=main, count=10)
+    '''
+    os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
+    wandb.login()
+    wandb.agent('adamdowse/k_diversity/0xrld1nf', function=main, count=1)
+
+
+
     
