@@ -139,8 +139,10 @@ def main():
         if test_metrics[1] > early_stop_max:
             early_stop_max = test_metrics[1]
             early_stop_count = 0
-        if early_stop_count > config['early_stop']:
-            break
+        else:
+            early_stop_count += train_DG.num_batches
+            if early_stop_count > config['early_stop']:
+                break
 
     wandb.log({'Images_used_hist':wandb.Histogram(train_DG.data_used)})
     #clear keras backend
@@ -168,7 +170,7 @@ if __name__ == "__main__":
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
     #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    wandb.agent('adamdowse/k_diversity/s9l3q894', function=main, count=1)
+    wandb.agent('adamdowse/k_diversity/fkvqn4po', function=main)
 
 
 
