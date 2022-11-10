@@ -39,16 +39,18 @@ def main():
         'test_percent' : 1,
         'group' : 't9_hyperparam_search',
         'model_name' : 'Simple_CNN',
-        'learning_rate' : wandb.config.lr,
-        'momentum' : wandb.config.momentum,
+        'learning_rate' : wandb.config.learning_rate,
+        'optimizer' : wandb.config.optimizer,
+        'momentum' : 0,
         'random_db' : 'True',
         'batch_size' : wandb.config.batch_size,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'max_its' : 30000,
+        'early_stop' : 5000,
         'mod_type' : 'Random_Bucket_full',
         'subset_type' : wandb.config.run_type[0], #Random_Bucket, Hard_Mining, All
         'train_type' : wandb.config.run_type[1], #SubMod, Random
-        'activations_delay' : wandb.config.activations_delay, #cannot be 0
+        'activations_delay' : 4, #cannot be 0
         'k_percent' : 1, #percent of data to use for RB and HM
         'activation_layer_name' : 'penultimate_layer',
     }
@@ -79,10 +81,14 @@ def main():
     train_rec_metric = tf.keras.metrics.Recall(name='train_recall')
 
     #Optimizer
-    if config['momentum'] == 0:
+    if config['optimizer'] == 'Adam':
+        optimizer = tf.keras.optimizers.Adam(learning_rate=config['learning_rate'], beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False)
+    elif config['optimizer'] == 'SGD':
         optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'])
-    else:
+    elif config['optimizer'] == 'Momentum':
         optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'],momentum=config['momentum'])
+    else:
+        print('Optimizer not recognised')     
 
     #Data Generator
     train_DG = sf.SubModDataGen(conn_path,config)
@@ -97,6 +103,8 @@ def main():
 
     #Training
     batch_num = 0
+    early_stop_max = 0
+    early_stop_count = 0
     while batch_num < config['max_its']:
         print('Batch Number: ',batch_num)
 
@@ -109,7 +117,7 @@ def main():
         #Scores the training data and decides what to train on
         print('Getting Subset')
         train_DG.get_data_subset(model,train_ds)
-        wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
+        #wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
 
         #Train on the data subset
         print('Training')
@@ -128,6 +136,12 @@ def main():
         wandb.log({'Test_loss':test_metrics[0],'Test_acc':test_metrics[1],'Test_prec':test_metrics[2],'Test_rec':test_metrics[3]},step=batch_num)
         batch_num += train_DG.num_batches
 
+        if test_metrics[1] > early_stop_max:
+            early_stop_max = test_metrics[1]
+            early_stop_count = 0
+        if early_stop_count > config['early_stop']:
+            break
+
     wandb.log({'Images_used_hist':wandb.Histogram(train_DG.data_used)})
     #clear keras backend
     tf.keras.backend.clear_session()
@@ -137,25 +151,24 @@ def main():
 
 if __name__ == "__main__":
     sweep_configuration = {
-        'method': 'random',
-        'name': 'sweep',
+        'method': 'grid',
+        'name': 'Test Acc vs Batch Size',
         'metric': {
             'goal': 'maximize', 
             'name': 'Test_acc'
             },
         'parameters': {
-            'batch_size': {'values': [16,32,64,128,256]},
-            'lr': {'values': [0.001,0.0001,0.00001]},
-            'momentum': {'distribution': 'uniform', 'min' : 0, 'max' : 1},
+            'batch_size': {'values': [4,8,16,32,64,128,256,512]},
+            'learning_rate': {'values': [0.00001,0.0001,0.001,0.01]},
             'run_type': {'values': [['All','Random'],['All','SubMod']]}, #,['Hard_Mining','SubMod'],['Hard_Mining','Random']
-            'activations_delay': {'values': [1,2,4,8,16,32,64,128]},
+            'optimizer': {'values': ['SGD','Adam','Momentum']},
             }
         }
 
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
-    #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    wandb.agent('adamdowse/k_diversity/gpzxiyzz', function=main, count=1)
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
+    wandb.agent('adamdowse/k_diversity/s9l3q894', function=main, count=1)
 
 
 
