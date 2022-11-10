@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
-    sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
+    #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
     wandb.agent('adamdowse/k_diversity/s9l3q894', function=main, count=1)
 
 
