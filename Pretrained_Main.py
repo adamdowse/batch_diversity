@@ -33,10 +33,10 @@ def main():
 
     wandb.init(project='k_diversity',entity='adamdowse')
     config= {
-        'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+        'db_path' : "DBs/",
         'ds_name' : "cifar10",
-        'train_percent' : 1,
-        'test_percent' : 1,
+        'train_percent' : 0.1,
+        'test_percent' : 0.1,
         'group' : 't9_hyperparam_search',
         'model_name' : 'Simple_CNN',
         'learning_rate' : wandb.config.learning_rate,
@@ -48,8 +48,8 @@ def main():
         'max_its' : 30000,
         'early_stop' : 5000,
         'mod_type' : 'Random_Bucket_full',
-        'subset_type' : wandb.config.run_type[0], #Random_Bucket, Hard_Mining, All
-        'train_type' : wandb.config.run_type[1], #SubMod, Random
+        'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
+        'train_type' : wandb.config.run_type, #SubMod, Random
         'activations_delay' : 4, #cannot be 0
         'k_percent' : 1, #percent of data to use for RB and HM
         'activation_layer_name' : 'penultimate_layer',
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         'parameters': {
             'batch_size': {'values': [4,8,16,32,64,128,256,512]},
             'learning_rate': {'values': [0.00001,0.0001,0.001,0.01]},
-            'run_type': {'values': [['All','Random'],['All','SubMod']]}, #,['Hard_Mining','SubMod'],['Hard_Mining','Random']
+            'run_type': {'values': ['Random','SubMod']}, #,['Hard_Mining','SubMod'],['Hard_Mining','Random']
             'optimizer': {'values': ['SGD','Adam','Momentum']},
             }
         }
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
     #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    wandb.agent('adamdowse/k_diversity/fkvqn4po', function=main)
+    wandb.agent('adamdowse/k_diversity/c6p4odio', function=main)
 
 
 
