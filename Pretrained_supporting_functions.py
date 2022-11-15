@@ -236,7 +236,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #Also for the every batch epoch we dont need all the activations
         #get the activations of the model for each image in the subset so that the subset_index aligns with activations
         if (self.config['train_type'] in ['Random','random']) or (batch_num % self.config['activations_delay'] != 0):
-            print('No activations needed')
+            return
         else:
             imgs = self.imgs[self.set_indexes]
             imgs = tf.cast(imgs,'float32')

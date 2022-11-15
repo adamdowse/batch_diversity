@@ -154,23 +154,23 @@ def main():
 if __name__ == "__main__":
     sweep_configuration = {
         'method': 'grid',
-        'name': 'Test Acc vs Batch Size',
+        'name': 'Test Acc vs Batch Size big batches 2',
         'metric': {
             'goal': 'maximize', 
             'name': 'Test_acc'
             },
         'parameters': {
-            'batch_size': {'values': [4,8,16,32,64,128,256,512]},
-            'learning_rate': {'values': [0.00001,0.0001,0.001,0.01]},
+            'batch_size': {'values': [1024]},
+            'learning_rate': {'values': [0.01,0.001,0.0001,0.00001]},
             'run_type': {'values': ['Random','SubMod']}, #,['Hard_Mining','SubMod'],['Hard_Mining','Random']
-            'optimizer': {'values': ['SGD','Adam','Momentum']},
+            'optimizer': {'values': ['SGD','Adam']},
             }
         }
 
     os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
     wandb.login()
-    #sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
-    wandb.agent('adamdowse/k_diversity/c6p4odio', function=main)
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
+    wandb.agent(sweep_id, function=main)
 
 
 
