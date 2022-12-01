@@ -1,6 +1,6 @@
 FROM tensorflow/tensorflow:latest-gpu
 
-COPY requirements.txt /opt/app/requirements.txt
+COPY .docker/requirements.txt /opt/app/requirements.txt
 RUN pip install -r /opt/app/requirements.txt
 
 RUN apt-get -y update
