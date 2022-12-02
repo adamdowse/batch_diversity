@@ -10,7 +10,7 @@ from sqlite3 import Error
 import numpy as np
 import scipy
 from scipy.spatial.distance import cdist
-import sklearn
+#import sklearn
 import random
 import os
 import wandb
