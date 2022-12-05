@@ -58,6 +58,26 @@ def EfficientNetV2B0_pretrained(num_classes,in_shape):
     ])
     return model
 
+def ResNet50(num_classes,in_shape):
+    model = tf.keras.applications.resnet50.ResNet50(
+        include_top=True,
+        weights=None,
+        input_tensor=None,
+        input_shape=in_shape,
+        pooling=None,
+        classes=num_classes)
+    return model
+
+def ResNet101(num_classes,in_shape):
+    model =  tf.keras.applications.resnet.ResNet101(
+        include_top=True,
+        weights=None,
+        input_tensor=None,
+        input_shape=in_shape,
+        pooling=None,
+        classes=num_classes)
+    return model
+
 
 def select_model(model_name,num_classes,img_shape):
     if model_name == 'Simple_CNN':
@@ -66,3 +86,7 @@ def select_model(model_name,num_classes,img_shape):
         return AlexNet(num_classes,img_shape)
     if model_name == 'EfficientNetV2B0_pretrained':
         return EfficientNetV2B0_pretrained(num_classes,img_shape)
+    if model_name == 'ResNet50':
+        return ResNet50(num_classes,img_shape)
+    if model_name == 'ResNet101':
+        return ResNet101(num_classes,img_shape)

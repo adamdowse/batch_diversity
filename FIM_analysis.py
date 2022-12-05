@@ -30,6 +30,8 @@ def Get_Z(model,data_input,y):#TODO
         logits = model(data_input)
         loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,labels=[y])
     grads = tape.gradient(loss,model.trainable_variables) #all grads 
+    grads = [tf.reshape(g,[-1]) for g in grads] #flatten grads
+    grads = tf.concat(grads,0) #concat grads
     grads = tf.math.square(grads) #all grads ^2
     grads = tf.math.reduce_sum(grads) #sum of grads
     grads = tf.math.sqrt(grads) #sqrt of sum of grads
@@ -47,9 +49,11 @@ def FIM_trace(data,total_classes,model):
         batch_data_input = data.__getitem__(b) [0]
         for data_input in batch_data_input:
             data_count += 1
+            if data_count % 1000 == 0:
+                print(data_count)
             for y in range(total_classes):
                 #calc sum of squared grads for a data point and class square rooted
-                fim += Get_Z(model,data_input,y)
+                fim += Get_Z(model,np.expand_dims(data_input, axis=0),y)
 
     fim /= data_count
     return fim

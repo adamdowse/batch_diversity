@@ -73,7 +73,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
         if self.config['train_type'] in ['Random','random']:
             if len(self.set_indexes) < self.config['batch_size']:
                 #if there are not enough images left in the set, use all the images
-                choices = np.arrange(self.set_indexes)
+                choices = np.arange(0,len(self.set_indexes))
             else:
                 #randomly select a batch of images
                 choices = np.random.randint(0,len(self.set_indexes),self.config['batch_size'])

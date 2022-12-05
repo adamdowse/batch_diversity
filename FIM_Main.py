@@ -38,14 +38,14 @@ def main():
         'train_percent' : 1,
         'test_percent' : 1,
         'group' : 'fim_test',
-        'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.001,
+        'model_name' : 'ResNet101',
+        'learning_rate' : 0.0001,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 32,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'max_its' : 30000,
+        'max_its' : 220000,
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
@@ -142,13 +142,13 @@ def main():
         wandb.log({'Approx_Trace_FIM': FIM_trace},step=batch_num)
 
         #Early stopping
-        if test_metrics[1] > early_stop_max:
-            early_stop_max = test_metrics[1]
-            early_stop_count = 0
-        else:
-            early_stop_count += train_DG.num_batches
-            if early_stop_count > config['early_stop']:
-                break
+        #if test_metrics[1] > early_stop_max:
+        #    early_stop_max = test_metrics[1]
+        #    early_stop_count = 0
+        #else:
+        #    early_stop_count += train_DG.num_batches
+        #    if early_stop_count > config['early_stop']:
+        #        break
 
     wandb.log({'Images_used_hist':wandb.Histogram(train_DG.data_used)})
     #clear keras backend
