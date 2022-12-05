@@ -35,17 +35,19 @@ def main():
     config= {
         'db_path' : "DBs/",
         'ds_name' : "cifar10",
-        'train_percent' : 1,
-        'test_percent' : 1,
+        'train_percent' : 0.1,
+        'test_percent' : 0.1,
         'group' : 'fim_test',
-        'model_name' : 'ResNet101',
-        'learning_rate' : 0.0001,
+        'model_name' : 'Simple_CNN',
+        'learning_rate' : 0.01,
+        'learning_rate_decay' : 0.97,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
-        'momentum' : 0,
+        'momentum' : 0.9,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 32,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'max_its' : 220000,
+        'max_its' : 320000,
+        'epochs'    : 100, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
@@ -80,12 +82,17 @@ def main():
     train_rec_metric = tf.keras.metrics.Recall(name='train_recall')
 
     #Optimizer
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        config['learning_rate'],
+        decay_steps=num_train_imgs/config['batch_size'],
+        decay_rate=config['learning_rate_decay'],
+        staircase=True)
     if config['optimizer'] == 'Adam':
-        optimizer = tf.keras.optimizers.Adam(learning_rate=config['learning_rate'], beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False)
     elif config['optimizer'] == 'SGD':
-        optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'])
+        optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
     elif config['optimizer'] == 'Momentum':
-        optimizer = tf.keras.optimizers.SGD(learning_rate=config['learning_rate'],momentum=config['momentum'])
+        optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule,momentum=config['momentum'])
     else:
         print('Optimizer not recognised')     
 
@@ -104,7 +111,9 @@ def main():
     batch_num = 0
     early_stop_max = 0
     early_stop_count = 0
-    while batch_num < config['max_its']:
+    epoch_num = 0
+    while batch_num < config['max_its'] or epoch_num < config['epochs']:
+        epoch_num += 1
         print('Batch Number: ',batch_num)
 
         #reset metrics
@@ -133,6 +142,7 @@ def main():
         #Log metrics
         wandb.log({'Train_loss':train_loss.result(),'Train_acc':train_acc_metric.result(),'Train_prec':train_prec_metric.result(),'Train_rec':train_rec_metric.result()},step=batch_num)
         wandb.log({'Test_loss':test_metrics[0],'Test_acc':test_metrics[1],'Test_prec':test_metrics[2],'Test_rec':test_metrics[3]},step=batch_num)
+        wandb.log({'Epoch':epoch_num},step=batch_num)
         batch_num += train_DG.num_batches
 
         #FIM Analysis
