@@ -322,8 +322,8 @@ def setup_db(config):
     print('INIT: Using ',config['ds_name'], ' data, downloading now...')
     train_split = 'train[:'+str(int(config['train_percent']*100))+'%]' 
     test_split = 'test[:'+str(int(config['test_percent']*100))+'%]'
-    train_ds, ds_info = tfds.load(config['ds_name'],with_info=True,shuffle_files=False,as_supervised=True,split=train_split)
-    test_ds = tfds.load(config['ds_name'],with_info=False,shuffle_files=False,as_supervised=True,split=test_split)
+    train_ds, ds_info = tfds.load(config['ds_name'],with_info=True,shuffle_files=False,as_supervised=True,split=train_split,data_dir=config['ds_path'],download=False)
+    test_ds = tfds.load(config['ds_name'],with_info=False,shuffle_files=False,as_supervised=True,split=test_split,data_dir=config['ds_path'],download=False)
 
     #Take the dataset and add info to db
     for i,(image,label) in enumerate(train_ds):

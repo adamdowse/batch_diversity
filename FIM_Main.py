@@ -13,8 +13,6 @@ import tracemalloc
 import os
 
 
-#/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
-#DBs/
 
 #run a standard model with the trace FIM recorded each epoch
 
@@ -35,31 +33,31 @@ def main():
 
     
     config= {
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'train_percent' : 1,
-        'test_percent' : 1,
-        'group' : 'fim_label_smoothing',
-        'model_name' : 'ResNet18',
-        'learning_rate' : 0.1,
+        'train_percent' : 0.1,
+        'test_percent' : 0.1,
+        'group' : 'fim_test',
+        'model_name' : 'Simple_CNN',
+        'learning_rate' : 0.01,
         'learning_rate_decay' : 0.97,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0.9,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
+        'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'max_its' : 520000,
-        'epochs'    : 200, #if this != 0 then it will override max_its    
-        'early_stop' : 0,
+        'max_its' : 320000,
+        'epochs'    : 100, #if this != 0 then it will override max_its    
+        'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
         'activations_delay' : 4, #cannot be 0 (used when submod is used)
         'k_percent' : 1, #percent of data to use for RB and HM
         'activation_layer_name' : 'penultimate_layer',
     }
-
-    wandb.init(config = config,project='FIM',entity='adamdowse')
 
     #Setup
     test_ds,ds_info,conn_path, train_ds = sf.setup_db(config)
@@ -78,7 +76,7 @@ def main():
     #Load pretrained weights TODO: make this a function
 
     #Loss
-    loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False,label_smoothing=config['label_smoothing'])
+    loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False,label_smoothing=config['label_smoothing'],)
     
     #Metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -131,7 +129,7 @@ def main():
         print('Getting Subset')
         train_DG.get_data_subset(model,train_ds)
         #wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
-
+        
         #Train on the data subset
         print('Training')
         for i in range(train_DG.num_batches):
@@ -139,6 +137,8 @@ def main():
             train_DG.get_activations(model,i)
             batch_data = train_DG.__getitem__(i)
             train_step(batch_data[0],batch_data[1])
+            
+        
         
         #Test on the test data
         print('Evaluating')
