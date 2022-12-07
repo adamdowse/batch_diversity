@@ -158,6 +158,7 @@ def main():
         batch_num += train_DG.num_batches
 
         #FIM Analysis
+        train_DG.get_data_subset(model,train_ds)
         FIM_trace = fim.FIM_trace(train_DG,num_classes,model) #return the approximate trace of the FIM
 
         #Log FIM
