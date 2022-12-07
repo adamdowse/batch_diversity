@@ -49,7 +49,7 @@ def main():
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
-        'weight_decay' : 0.01,
+        'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'max_its' : 420000,
         'epochs'    : 400, #if this != 0 then it will override max_its    
