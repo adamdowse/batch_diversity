@@ -5,16 +5,17 @@ from keras import layers
 import math
 
 
-def Simple_CNN(num_classes,in_shape):
+def Simple_CNN(num_classes,in_shape,REG):
     model = tf.keras.Sequential([
-        layers.Conv2D(32,(3,3), activation='relu',input_shape=in_shape),
+        layers.Conv2D(32,(3,3), activation='relu',input_shape=in_shape,kernel_regularizer=tf.keras.regularizers.l2(REG)),
         layers.MaxPool2D((2,2)),
         layers.Flatten(),
-        layers.Dense(100,activation='relu',name="penultimate_layer"),
+        layers.Dense(100,activation='relu',kernel_regularizer=tf.keras.regularizers.l2(REG),name="penultimate_layer"),
         layers.Dense(num_classes,name="last_layer"),
         layers.Softmax()
     ])
     return model
+
 
 def All_CNN_noBN(num_classes,in_shape):
     #cnn arch used in crittical learnning point paper
@@ -109,9 +110,9 @@ def ResNet101(num_classes,in_shape):
         classes=num_classes)
     return model
 
-def ResNet18(num_classes,in_shape):
+def ResNet18(num_classes,in_shape,REG):
     inputs = keras.Input(shape=in_shape)
-    outputs = build_resnet(inputs, [2, 2, 2, 2], num_classes)
+    outputs = build_resnet(inputs, [2, 2, 2, 2], num_classes,REG)
     model = keras.Model(inputs, outputs)
     return model
     
@@ -119,9 +120,9 @@ def ResNet18(num_classes,in_shape):
 
 
 
-def select_model(model_name,num_classes,img_shape):
+def select_model(model_name,num_classes,img_shape,REG=0):
     if model_name == 'Simple_CNN':
-        return Simple_CNN(num_classes,img_shape)
+        return Simple_CNN(num_classes,img_shape,REG)
     if model_name == 'AlexNet':
         return AlexNet(num_classes,img_shape)
     if model_name == 'EfficientNetV2B0_pretrained':
@@ -131,7 +132,7 @@ def select_model(model_name,num_classes,img_shape):
     if model_name == 'ResNet101':
         return ResNet101(num_classes,img_shape)
     if model_name == 'ResNet18':
-        return ResNet18(num_classes,img_shape)
+        return ResNet18(num_classes,img_shape,REG)
     if model_name == 'All_CNN_noBN':
         return All_CNN_noBN(num_classes,img_shape)
     if model_name == 'FullyConnected':
@@ -139,12 +140,12 @@ def select_model(model_name,num_classes,img_shape):
 
 
 
-def build_resnet(x,vars,num_classes):
+def build_resnet(x,vars,num_classes,REG=0):
     kaiming_normal = keras.initializers.VarianceScaling(scale=2.0, mode='fan_out', distribution='untruncated_normal')
 
-    def conv3x3(x, out_planes, stride=1, name=None):
+    def conv3x3(x, out_planes, stride=1, name=None,REG=0):
         x = layers.ZeroPadding2D(padding=1, name=f'{name}_pad')(x)
-        return layers.Conv2D(filters=out_planes, kernel_size=3, strides=stride, use_bias=False, kernel_initializer=kaiming_normal, name=name)(x)
+        return layers.Conv2D(filters=out_planes, kernel_size=3, strides=stride, use_bias=False, kernel_initializer=kaiming_normal,kernel_regularizer=keras.regularizers.l2(REG), name=name)(x)
 
     def basic_block(x, planes, stride=1, downsample=None, name=None):
         identity = x
@@ -165,12 +166,12 @@ def build_resnet(x,vars,num_classes):
 
         return out
 
-    def make_layer(x, planes, blocks, stride=1, name=None):
+    def make_layer(x, planes, blocks, stride=1, name=None,REG=0):
         downsample = None
         inplanes = x.shape[3]
         if stride != 1 or inplanes != planes:
             downsample = [
-                layers.Conv2D(filters=planes, kernel_size=1, strides=stride, use_bias=False, kernel_initializer=kaiming_normal, name=f'{name}.0.downsample.0'),
+                layers.Conv2D(filters=planes, kernel_size=1, strides=stride, use_bias=False, kernel_initializer=kaiming_normal,kernel_regularizer=keras.regularizers.l2(REG), name=f'{name}.0.downsample.0'),
                 layers.BatchNormalization(momentum=0.9, epsilon=1e-5, name=f'{name}.0.downsample.1'),
             ]
 
@@ -180,9 +181,9 @@ def build_resnet(x,vars,num_classes):
 
         return x
 
-    def resnet(x, blocks_per_layer, num_classes):
+    def resnet(x, blocks_per_layer, num_classes,REG):
         x = layers.ZeroPadding2D(padding=3, name='conv1_pad')(x)
-        x = layers.Conv2D(filters=64, kernel_size=7, strides=2, use_bias=False, kernel_initializer=kaiming_normal, name='conv1')(x)
+        x = layers.Conv2D(filters=64, kernel_size=7, strides=2, use_bias=False, kernel_initializer=kaiming_normal,kernel_regularizer=keras.regularizers.l2(REG), name='conv1')(x)
         x = layers.BatchNormalization(momentum=0.9, epsilon=1e-5, name='bn1')(x)
         x = layers.ReLU(name='relu1')(x)
         x = layers.ZeroPadding2D(padding=1, name='maxpool_pad')(x)

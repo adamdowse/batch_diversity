@@ -42,14 +42,14 @@ def main():
         'test_percent' : 0.1,
         'group' : '0.1cifar10',
         'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.001,
+        'learning_rate' : 0.0001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
-        'weight_decay' : 0,
+        'weight_decay' : 0.01,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'max_its' : 420000,
         'epochs'    : 400, #if this != 0 then it will override max_its    
@@ -72,14 +72,14 @@ def main():
 
     #Model
     tf.keras.backend.clear_session()
-    model = sm.select_model(config['model_name'],num_classes,img_size)
+    model = sm.select_model(config['model_name'],num_classes,img_size,config['weight_decay'])
     model.build(img_size+(1,))
     model.summary()
 
     #Load pretrained weights TODO: make this a function
 
     #Loss
-    loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False,label_smoothing=config['label_smoothing'],)
+    loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False,label_smoothing=config['label_smoothing'])
     
     #Metrics
     train_loss = tf.keras.metrics.Mean(name='train_loss')
