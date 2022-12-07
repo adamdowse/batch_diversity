@@ -31,19 +31,20 @@ def main():
         train_rec_metric(labels,preds)
         return
 
-    
+    #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/datasets/
+    #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/datasets/",
-        'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+        'ds_path' : "/datasets/",
+        'db_path' : "DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 0.1,
         'test_percent' : 0.1,
-        'group' : 'fim_test',
+        'group' : '0.1cifar10',
         'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.01,
-        'learning_rate_decay' : 0.97,
+        'learning_rate' : 0.0001,
+        'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
-        'momentum' : 0.9,
+        'momentum' : 0,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
@@ -60,6 +61,7 @@ def main():
     }
 
     #Setup
+    wandb.init(project='FIM',config=config)
     test_ds,ds_info,conn_path, train_ds = sf.setup_db(config)
 
     num_classes = ds_info.features['label'].num_classes
@@ -85,11 +87,15 @@ def main():
     train_rec_metric = tf.keras.metrics.Recall(name='train_recall')
 
     #Optimizer
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-        config['learning_rate'],
-        decay_steps=num_train_imgs/config['batch_size'],
-        decay_rate=config['learning_rate_decay'],
-        staircase=True)
+    if config['learning_rate_decay'] == 1 or config['learning_rate_decay'] == 0:
+        lr_schedule = config['learning_rate']
+    else:
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            config['learning_rate'],
+            decay_steps=num_train_imgs/config['batch_size'],
+            decay_rate=config['learning_rate_decay'],
+            staircase=True)
+
     if config['optimizer'] == 'Adam':
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, beta_1=0.9, beta_2=0.999, epsilon=1e-07, amsgrad=False)
     elif config['optimizer'] == 'SGD':
