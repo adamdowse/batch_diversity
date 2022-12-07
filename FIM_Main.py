@@ -32,9 +32,10 @@ def main():
         return
 
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/datasets/
+    #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 0.1,
@@ -50,8 +51,8 @@ def main():
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'max_its' : 320000,
-        'epochs'    : 100, #if this != 0 then it will override max_its    
+        'max_its' : 420000,
+        'epochs'    : 400, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
