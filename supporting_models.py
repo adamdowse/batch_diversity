@@ -143,7 +143,7 @@ def select_model(model_name,num_classes,img_shape,REG=0):
 def build_resnet(x,vars,num_classes,REG=0):
     kaiming_normal = keras.initializers.VarianceScaling(scale=2.0, mode='fan_out', distribution='untruncated_normal')
 
-    def conv3x3(x, out_planes, stride=1, name=None,REG=0):
+    def conv3x3(x, out_planes, stride=1, name=None):
         x = layers.ZeroPadding2D(padding=1, name=f'{name}_pad')(x)
         return layers.Conv2D(filters=out_planes, kernel_size=3, strides=stride, use_bias=False, kernel_initializer=kaiming_normal,kernel_regularizer=keras.regularizers.l2(REG), name=name)(x)
 
@@ -166,7 +166,7 @@ def build_resnet(x,vars,num_classes,REG=0):
 
         return out
 
-    def make_layer(x, planes, blocks, stride=1, name=None,REG=0):
+    def make_layer(x, planes, blocks, stride=1, name=None):
         downsample = None
         inplanes = x.shape[3]
         if stride != 1 or inplanes != planes:
@@ -181,7 +181,7 @@ def build_resnet(x,vars,num_classes,REG=0):
 
         return x
 
-    def resnet(x, blocks_per_layer, num_classes,REG):
+    def resnet(x, blocks_per_layer, num_classes):
         x = layers.ZeroPadding2D(padding=3, name='conv1_pad')(x)
         x = layers.Conv2D(filters=64, kernel_size=7, strides=2, use_bias=False, kernel_initializer=kaiming_normal,kernel_regularizer=keras.regularizers.l2(REG), name='conv1')(x)
         x = layers.BatchNormalization(momentum=0.9, epsilon=1e-5, name='bn1')(x)
