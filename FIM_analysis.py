@@ -27,8 +27,9 @@ def Get_Z(model,data_input,y):#TODO
     #returns the z value for a given x and y
     with tf.GradientTape() as tape:
         #NEED SOMETHING HERE TO SAY WHAT WEIGHTS TO USE TODO
-        logits = model(data_input)
-        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,labels=[y])
+        output = model(data_input)
+        scce = tf.keras.losses.sparse_categorical_crossentropy(from_logits=False)
+        loss = scce(y,output)
     grads = tape.gradient(loss,model.trainable_variables) #all grads 
     grads = [tf.reshape(g,[-1]) for g in grads] #flatten grads
     grads = tf.concat(grads,0) #concat grads

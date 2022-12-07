@@ -41,7 +41,7 @@ def main():
         'test_percent' : 0.1,
         'group' : '0.1cifar10',
         'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.0001,
+        'learning_rate' : 0.001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
@@ -121,7 +121,7 @@ def main():
     early_stop_max = 0
     early_stop_count = 0
     epoch_num = 0
-    while batch_num < config['max_its'] or epoch_num < config['epochs']:
+    while batch_num < config['max_its'] and epoch_num < config['epochs']:
         epoch_num += 1
         print('Batch Number: ',batch_num)
 
