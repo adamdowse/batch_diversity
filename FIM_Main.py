@@ -37,12 +37,12 @@ def main():
     config= {
         'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "DBs/",
-        'ds_name' : "cifar10",
+        'ds_name' : "mnist",
         'train_percent' : 0.1,
         'test_percent' : 0.1,
-        'group' : '0.1cifar10',
+        'group' : '0.1mnist',
         'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.0001,
+        'learning_rate' : 0.001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
@@ -162,6 +162,7 @@ def main():
         FIM_trace = fim.FIM_trace(train_DG,num_classes,model) #return the approximate trace of the FIM
 
         #Log FIM
+        print('FIM Trace: ',FIM_trace)
         wandb.log({'Approx_Trace_FIM': FIM_trace},step=batch_num)
 
         #Early stopping

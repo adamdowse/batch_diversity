@@ -6,10 +6,6 @@ import time
 
 
 #Collection of functions that can calculate fisher information matrix statistics
-
-def FIM_trace(fim):
-    return np.prod(fim)
-
 def Get_weights(model,split_layers=False):
     #get the weights from a tensorflow model in a list
     weights = model.trainable_variables
@@ -44,9 +40,9 @@ def Get_Z(model,data_input,y):#TODO
     #returns the z value for a given x and y
     with tf.GradientTape() as tape:
         #NEED SOMETHING HERE TO SAY WHAT WEIGHTS TO USE TODO
-        output = model(data_input)[:,y]
-        output = tf.math.log(output)
-        loss = tf.math.reduce_mean(output,axis=0)
+        output = model(data_input)[0][y]
+        loss = tf.math.log(output)
+        #loss = tf.math.reduce_mean(output,axis=0)
 
     grads = tape.gradient(loss,model.trainable_variables) #all grads 
     #select the weights
@@ -56,11 +52,12 @@ def Get_Z(model,data_input,y):#TODO
     grads = tf.concat(grads,0) #concat grads
     grads = tf.math.square(grads) #all grads ^2
     grads = tf.math.reduce_sum(grads) #sum of grads
+    grads = grads * output
     #grads = tf.math.sqrt(grads) #sqrt of sum of grads
     return grads
 
 
-def oldFIM_trace(data,total_classes,model): 
+def FIM_trace(data,total_classes,model): 
     #data       = data ittorator like a genorator
     #total_classes = the number of class outputs
     #model      = tf model that returns the logits outputs for all classes
@@ -72,23 +69,19 @@ def oldFIM_trace(data,total_classes,model):
         batch_data_input = data.__getitem__(b) [0]
         for data_input in batch_data_input:
             data_count += 1
-            if data_count % 100 == 0:
+            if data_count % 1000 == 0:
                 print(data_count)
-                break
             for y in range(total_classes):
                 #calc sum of squared grads for a data point and class square rooted
                 z = Get_Z(model,tf.expand_dims(data_input, axis=0),tf.convert_to_tensor(y, dtype=tf.int32))
                 fim += z
-        if data_count % 100 == 0:
-                print(data_count)
-                break
 
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)
 
     return fim
 
-def FIM_trace(data,total_classes,model): 
+def Batch_FIM_trace(data,total_classes,model): 
     #data       = data ittorator like a genorator
     #total_classes = the number of class outputs
     #model      = tf model that returns the logits outputs for all classes
@@ -108,4 +101,30 @@ def FIM_trace(data,total_classes,model):
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)
 
+    return fim
+
+def Emperical_FIM_trace(data,total_classes,model): 
+    #data       = data ittorator like a genorator
+    #total_classes = the number of class outputs
+    #model      = tf model that returns the logits outputs for all classes
+    #calc fim diag
+    #t = time.time()
+    fim = 0
+    data_count = 0
+    for b in range(data.num_batches):
+        batch_data_input = data.__getitem__(b)
+        x_batch = batch_data_input[0]
+        y_batch = batch_data_input[1]
+        for x,y in zip(x_batch,y_batch):
+            data_count += 1
+            if data_count % 1000 == 0:
+                print(data_count)
+
+            y = tf.argmax(y)
+            #calc sum of squared grads for a data point and class square rooted
+            z = Get_Z(model,tf.expand_dims(x,axis=0),tf.convert_to_tensor(y,dtype=tf.int64))
+            fim += z
+
+    fim /= data_count
+    #print('FIM trace calc time:',time.time()-t)
     return fim
