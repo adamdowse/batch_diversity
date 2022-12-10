@@ -52,9 +52,11 @@ def Get_Z(model,data_input,y):#TODO
     grads = tf.concat(grads,0) #concat grads
     grads = tf.math.square(grads) #all grads ^2
     grads = tf.math.reduce_sum(grads) #sum of grads
-    grads = grads * output
-    #grads = tf.math.sqrt(grads) #sqrt of sum of grads
+    #grads = grads
+    grads = tf.math.sqrt(grads) #sqrt of sum of grads
     return grads
+
+
 
 
 def FIM_trace(data,total_classes,model): 
@@ -71,15 +73,20 @@ def FIM_trace(data,total_classes,model):
             data_count += 1
             if data_count % 1000 == 0:
                 print(data_count)
+                break
             for y in range(total_classes):
                 #calc sum of squared grads for a data point and class square rooted
                 z = Get_Z(model,tf.expand_dims(data_input, axis=0),tf.convert_to_tensor(y, dtype=tf.int32))
                 fim += z
-
+        if data_count % 1000 == 0:
+                print(data_count)
+                break
+    #think about adding var calc too
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)
 
     return fim
+
 
 def Batch_FIM_trace(data,total_classes,model): 
     #data       = data ittorator like a genorator
@@ -117,13 +124,17 @@ def Emperical_FIM_trace(data,total_classes,model):
         y_batch = batch_data_input[1]
         for x,y in zip(x_batch,y_batch):
             data_count += 1
-            if data_count % 1000 == 0:
+            if data_count % 10000 == 0:
                 print(data_count)
+                break
 
             y = tf.argmax(y)
             #calc sum of squared grads for a data point and class square rooted
-            z = Get_Z(model,tf.expand_dims(x,axis=0),tf.convert_to_tensor(y,dtype=tf.int64))
+            z = Get_Z(model,tf.expand_dims(x,axis=0),tf.convert_to_tensor(y,dtype=tf.int32))
             fim += z
+        if data_count % 10000 == 0:
+            print(data_count)
+            break
 
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)

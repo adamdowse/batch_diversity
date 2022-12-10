@@ -2,10 +2,10 @@ universe = docker
 docker_image = registry.eps.surrey.ac.uk/adamsdocker:38355
 
 executable = /usr/bin/python3
-arguments = $ENV(PWD)/Pretrained_Main.py 
+arguments = $ENV(PWD)/FIM_Main.py 
 
 should_transfer_files = YES
-environment = "mount=$ENV(PWD),/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs"
+environment = "mount=$ENV(PWD),/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878"
 
 log = $ENV(PWD)/condor/c$(cluster).p$(process).log
 output = $ENV(PWD)/condor/c$(cluster).p$(process).out

@@ -31,28 +31,28 @@ def main():
         train_rec_metric(labels,preds)
         return
 
-    #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/datasets/
+    #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
-        'db_path' : "DBs/",
-        'ds_name' : "mnist",
-        'train_percent' : 0.1,
-        'test_percent' : 0.1,
-        'group' : '0.1mnist',
-        'model_name' : 'Simple_CNN',
-        'learning_rate' : 0.001,
-        'learning_rate_decay' : 0,
-        'optimizer' : 'SGD', #SGD, Adam, Momentum
-        'momentum' : 0,
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets",
+        'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
+        'ds_name' : "cifar10",
+        'train_percent' : 1,
+        'test_percent' : 1,
+        'group' : '1cifar10_tests',
+        'model_name' : 'ResNet18',
+        'learning_rate' : 0.1,
+        'learning_rate_decay' : 0.97,
+        'optimizer' : 'Momentum', #SGD, Adam, Momentum
+        'momentum' : 0.9,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
-        'weight_decay' : 0,
+        'weight_decay' : 0.0005,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'max_its' : 420000,
-        'epochs'    : 400, #if this != 0 then it will override max_its    
+        'epochs'    : 200, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
