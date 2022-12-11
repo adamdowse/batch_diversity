@@ -35,13 +35,13 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
-        'db_path' : "DBs/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'train_percent' : 0.1,
-        'test_percent' : 0.1,
-        'group' : '0.1cifar10_tests',
-        'model_name' : 'Simple_CNN',
+        'train_percent' : 1,
+        'test_percent' : 1,
+        'group' : '1cifar10_tests',
+        'model_name' : 'ResNet18',
         'learning_rate' : 0.1,
         'learning_rate_decay' : 0.97,
         'optimizer' : 'Momentum', #SGD, Adam, Momentum
