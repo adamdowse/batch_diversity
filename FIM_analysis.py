@@ -36,11 +36,13 @@ def oldGet_Z(model,data_input,y):#TODO
     return grads
 
 @tf.function
-def Get_Z(model,data_input,y):#TODO
+def Get_Z(model,data_input,total_classes):#TODO
     #returns the z value for a given x and y
     with tf.GradientTape() as tape:
         #NEED SOMETHING HERE TO SAY WHAT WEIGHTS TO USE TODO
-        output = model(data_input)[0][y]
+        output = model(data_input)
+        #sample from the output distribution
+        output = output[0,tf.random.categorical(tf.math.log(output), 1)[0][0]]
         loss = tf.math.log(output)
         #loss = tf.math.reduce_mean(output,axis=0)
 
@@ -52,7 +54,7 @@ def Get_Z(model,data_input,y):#TODO
     grads = tf.concat(grads,0) #concat grads
     grads = tf.math.square(grads) #all grads ^2
     grads = tf.math.reduce_sum(grads) #sum of grads
-    #grads = grads
+
     grads = tf.math.sqrt(grads) #sqrt of sum of grads
     return grads
 
@@ -74,10 +76,9 @@ def FIM_trace(data,total_classes,model):
             if data_count % 1000 == 0:
                 print(data_count)
                 break
-            for y in range(total_classes):
-                #calc sum of squared grads for a data point and class square rooted
-                z = Get_Z(model,tf.expand_dims(data_input, axis=0),tf.convert_to_tensor(y, dtype=tf.int32))
-                fim += z
+            #calc sum of squared grads for a data point and class square rooted
+            z = Get_Z(model,tf.expand_dims(data_input, axis=0),tf.convert_to_tensor(total_classes, dtype=tf.int32))
+            fim += z
         if data_count % 1000 == 0:
                 print(data_count)
                 break
@@ -109,6 +110,8 @@ def Batch_FIM_trace(data,total_classes,model):
     #print('FIM trace calc time:',time.time()-t)
 
     return fim
+
+
 
 def Emperical_FIM_trace(data,total_classes,model): 
     #data       = data ittorator like a genorator
