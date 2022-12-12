@@ -19,10 +19,14 @@ import os
 def main():
 
     @tf.function
-    def train_step(imgs,labels):
+    def train_step(imgs,labels,beta):
         with tf.GradientTape() as tape:
             preds = model(imgs,training=True)
             loss = loss_func(labels,preds)
+            #add l2 norm of all weights to loss
+            for w in model.trainable_weights:
+                loss += beta * tf.nn.l2_loss(w)
+
         grads = tape.gradient(loss,model.trainable_variables)
         optimizer.apply_gradients(zip(grads,model.trainable_variables))
         train_loss(loss)
@@ -51,18 +55,20 @@ def main():
         'label_smoothing' : 0,
         'weight_decay' : 0.0005,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'max_its' : 420000,
-        'epochs'    : 200, #if this != 0 then it will override max_its    
+        'start_defect_epoch' : 0,
+        'defect_length' : 5, # length of defect in epochs
+        'max_its' : 46900,
+        'epochs'    : 0, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
-        'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
+        'subset_type' : 'Hard_Mining', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
         'activations_delay' : 4, #cannot be 0 (used when submod is used)
-        'k_percent' : 1, #percent of data to use for RB and HM
+        'k_percent' : 0.1, #percent of data to use for RB and HM
         'activation_layer_name' : 'penultimate_layer',
     }
 
     #Setup
-    wandb.init(project='FIM',config=config)
+    wandb.init(project='FIM_Sensitivity',config=config)
     test_ds,ds_info,conn_path, train_ds = sf.setup_db(config)
 
     num_classes = ds_info.features['label'].num_classes
@@ -75,8 +81,6 @@ def main():
     model = sm.select_model(config['model_name'],num_classes,img_size,config['weight_decay'])
     model.build(img_size+(1,))
     model.summary()
-
-    #Load pretrained weights TODO: make this a function
 
     #Loss
     loss_func = tf.keras.losses.CategoricalCrossentropy(from_logits=False,label_smoothing=config['label_smoothing'])
@@ -115,16 +119,17 @@ def main():
 
     #Wandb
     #sf.wandb_setup(config,disabled)
-    logging_callback = WandbCallback(log_freq=1,save_model=False,save_code=False)
+    #logging_callback = WandbCallback(log_freq=1,save_model=False,save_code=False)
 
     #Training
     batch_num = 0
     early_stop_max = 0
     early_stop_count = 0
     epoch_num = 0
-    while batch_num < config['max_its'] and epoch_num < config['epochs']:
+    while batch_num < config['max_its']:
         epoch_num += 1
         print('Batch Number: ',batch_num)
+        print('Epoch Number: ',epoch_num)
 
         #reset metrics
         train_loss.reset_states()
@@ -134,7 +139,13 @@ def main():
 
         #Scores the training data and decides what to train on
         print('Getting Subset')
-        train_DG.get_data_subset(model,train_ds)
+        if epoch_num > config['start_defect_epoch'] and epoch_num < config['start_defect_epoch']+(config['defect_length']*config['k_percent']):
+            #this initilises the data generator with the defect data 
+            train_DG.get_data_subset(model,train_ds,defect=True)
+        else:
+            #this initilises the data generator with the normal data
+            train_DG.get_data_subset(model,train_ds,defect=False)
+
         #wandb.log({'Train_loss_hist':wandb.Histogram(train_DG.losses)},step=batch_num)
         
         #Train on the data subset
@@ -145,8 +156,6 @@ def main():
             batch_data = train_DG.__getitem__(i)
             train_step(batch_data[0],batch_data[1])
             
-        
-        
         #Test on the test data
         print('Evaluating')
         test_metrics = model.evaluate(test_DG)
@@ -158,7 +167,7 @@ def main():
         batch_num += train_DG.num_batches
 
         #FIM Analysis
-        train_DG.get_data_subset(model,train_ds)
+        train_DG.get_data_subset(model,train_ds,defect=False)
         FIM_trace = fim.FIM_trace(train_DG,num_classes,model) #return the approximate trace of the FIM
 
         #Log FIM
@@ -174,10 +183,11 @@ def main():
         #    if early_stop_count > config['early_stop']:
         #        break
 
-    wandb.log({'Images_used_hist':wandb.Histogram(train_DG.data_used)})
-    #clear keras backend
+
+    #wandb.log({'Images_used_hist':wandb.Histogram(train_DG.data_used)})
+
+    #Finish - clear keras backend
     tf.keras.backend.clear_session()
-    #Finish
     print('Finished')
 
 
@@ -204,7 +214,3 @@ if __name__ == "__main__":
         
         sweep_id = wandb.sweep(sweep=sweep_configuration, project='k_diversity')
         wandb.agent(sweep_id, function=main)
-
-
-
-    

@@ -36,26 +36,22 @@ def oldGet_Z(model,data_input,y):#TODO
     return grads
 
 @tf.function
-def Get_Z(model,data_input,total_classes):#TODO
+def Get_Z(model,data_input):#TODO
     #returns the z value for a given x and y
     with tf.GradientTape() as tape:
-        #NEED SOMETHING HERE TO SAY WHAT WEIGHTS TO USE TODO
-        output = model(data_input)
+        output = model(data_input,training=False)
         #sample from the output distribution
         output = output[0,tf.random.categorical(tf.math.log(output), 1)[0][0]]
         loss = tf.math.log(output)
-        #loss = tf.math.reduce_mean(output,axis=0)
 
     grads = tape.gradient(loss,model.trainable_variables) #all grads 
     #select the weights
     grads = [g for g in grads if ('Filter' in g.name) or ('MatMul' in g.name)]
-    #TODO - DO we need just the weights? or all the grads?
     grads = [tf.reshape(g,[-1]) for g in grads] #flatten grads
     grads = tf.concat(grads,0) #concat grads
     grads = tf.math.square(grads) #all grads ^2
     grads = tf.math.reduce_sum(grads) #sum of grads
-
-    grads = tf.math.sqrt(grads) #sqrt of sum of grads
+    #grads = tf.math.sqrt(grads) #sqrt of sum of grads
     return grads
 
 
@@ -73,13 +69,13 @@ def FIM_trace(data,total_classes,model):
         batch_data_input = data.__getitem__(b) [0]
         for data_input in batch_data_input:
             data_count += 1
-            if data_count % 1000 == 0:
+            if data_count % 10000 == 0:
                 print(data_count)
                 break
             #calc sum of squared grads for a data point and class square rooted
-            z = Get_Z(model,tf.expand_dims(data_input, axis=0),tf.convert_to_tensor(total_classes, dtype=tf.int32))
+            z = Get_Z(model,tf.expand_dims(data_input, axis=0))
             fim += z
-        if data_count % 1000 == 0:
+        if data_count % 10000 == 0:
                 print(data_count)
                 break
     #think about adding var calc too

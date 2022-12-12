@@ -107,9 +107,9 @@ class SubModDataGen(tf.keras.utils.Sequence):
         #calculates the number of batches to use
         return self.num_batches
 
-    def get_data_subset(self, model,train_ds):
+    def get_data_subset(self, model,train_ds,defect=False):
         #create a subset of the data to use for training
-        if self.config['subset_type'] in ['All','all']:
+        if self.config['subset_type'] in ['All','all'] and defect==False:
             #Use all the data
             print('No hard mining, full epoch used')
             self.set_indexes = np.arange(self.num_images)
@@ -117,7 +117,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
             self.num_batches = int(np.ceil(self.num_images/self.config['batch_size']))
             self.losses = np.zeros(self.num_images)
 
-        elif self.config['subset_type'] in ['HM','hard_mining','Hard_Mining','Hard_mining']:
+        elif self.config['subset_type'] in ['HM','hard_mining','Hard_Mining','Hard_mining'] and defect==True:
             #score all images with loss and keep activations from the top k % of images
             print("Hard mining")
             #get losses for all images
@@ -128,7 +128,7 @@ class SubModDataGen(tf.keras.utils.Sequence):
             self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
             self.data_used[self.set_indexes] += 1
         
-        elif self.config['subset_type'] in ['Random_Bucket','random_bucket','Random_bucket'] :
+        elif self.config['subset_type'] in ['Random_Bucket','random_bucket','Random_bucket'] and defect==True:
             #select a random bucket of images from the full set
             print("Random Bucket")
             self.set_indexes = np.random.randint(0,self.num_images,int(np.ceil(self.config['k_percent']*self.num_images)))
