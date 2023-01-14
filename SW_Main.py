@@ -24,8 +24,8 @@ def main():
             preds = model(imgs,training=True)
             loss = loss_func(labels,preds)
             #add l2 norm of all weights to loss
-            for w in model.trainable_weights:
-                loss += beta * tf.nn.l2_loss(w)
+            #for w in model.trainable_weights:
+            #    loss += beta * tf.nn.l2_loss(w)
 
         grads = tape.gradient(loss,model.trainable_variables)
         optimizer.apply_gradients(zip(grads,model.trainable_variables))
@@ -39,13 +39,13 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
-        'db_path' : "DBs/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 1,
         'test_percent' : 1,
-        'group' : '0.1cifar10_tests',
-        'model_name' : 'Simple_CNN',
+        'group' : 'cifar10_10-0.5defect',
+        'model_name' : 'ResNet18',
         'learning_rate' : 0.1,
         'learning_rate_decay' : 0.97,
         'optimizer' : 'Momentum', #SGD, Adam, Momentum
@@ -53,14 +53,14 @@ def main():
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
-        'weight_decay' : 0.0005,
+        'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'start_defect_epoch' : 0,
-        'defect_length' : 5, # length of defect in epochs
+        'defect_length' : 10, # length of defect in epochs
         'max_its' : 46900,
         'epochs'    : 0, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
-        'subset_type' : 'Hard_Mining', #Random_Bucket, Hard_Mining, All
+        'subset_type' : 'Easy_Mining', #Random_Bucket, Hard_Mining, All
         'train_type' : 'Random', #SubMod, Random
         'activations_delay' : 4, #cannot be 0 (used when submod is used)
         'k_percent' : 0.1, #percent of data to use for RB and HM
