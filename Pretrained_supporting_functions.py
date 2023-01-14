@@ -127,7 +127,20 @@ class SubModDataGen(tf.keras.utils.Sequence):
             self.set_indexes = np.argsort(self.losses)[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
             self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
             self.data_used[self.set_indexes] += 1
-        
+
+        elif self.config['subset_type'] in ['EM','easy_mining','Easy_Mining', 'Easy_mining'] and defect==True:
+            print('Easy mining')
+            #get losses for al images
+            self.losses = self.__record_losses(model,train_ds)
+
+            #get the bottom k% images
+            #invert argsort
+            sort = np.flip(np.argsort(self.losses))
+            self.set_indexes = sort[:int(np.ceil(self.config['k_percent']*len(self.losses)))]
+            self.num_batches = int(np.ceil(len(self.set_indexes)/self.config['batch_size']))
+            self.data_used[self.set_indexes] += 1
+
+
         elif self.config['subset_type'] in ['Random_Bucket','random_bucket','Random_bucket'] and defect==True:
             #select a random bucket of images from the full set
             print("Random Bucket")
