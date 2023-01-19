@@ -39,7 +39,7 @@ def oldGet_Z(model,data_input,y):#TODO
 def Get_Z(model,data_input):#TODO
     #returns the z value for a given x and y
     with tf.GradientTape() as tape:
-        output = model(data_input,training=False)
+        output = model(data_input,training=False)[0]
         #sample from the output distribution
         output = output[0,tf.random.categorical(tf.math.log(output), 1)[0][0]]
         loss = tf.math.log(output)

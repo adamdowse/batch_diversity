@@ -152,12 +152,16 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
             if len(self.set_indexes) < self.batch_size: 
                 self.batch_indexes = self.set_indexes
             else: 
+                if len(self.set_indexes) > 10000:
+                    subset_indexes = self.set_indexes[np.random.choice(len(self.set_indexes),5000)]
+                else:
+                    subset_indexes = self.set_indexes
                 for i in range(self.batch_size):
                     #calculate the scores for the subset if an item is added from the superset.
-                    Uscores = self.lambdas[0] * Norm(Uncertainty_Score(self.preds,self.set_indexes))
-                    Rscores = self.lambdas[1] * Norm(Redundancy_Score(self.activations,self.set_indexes,self.batch_indexes))
-                    Mscores = self.lambdas[2] * Norm(Mean_Close_Score(self.activations,self.set_indexes))
-                    Fscores = self.lambdas[3] * Norm(Feature_Match_Score(self.activations,self.set_indexes,self.batch_indexes))
+                    Uscores = self.lambdas[0] * Norm(Uncertainty_Score(self.preds,subset_indexes))
+                    Rscores = self.lambdas[1] * Norm(Redundancy_Score(self.activations,subset_indexes,self.batch_indexes))
+                    Mscores = self.lambdas[2] * Norm(Mean_Close_Score(self.activations,subset_indexes))
+                    Fscores = self.lambdas[3] * Norm(Feature_Match_Score(self.activations,subset_indexes,self.batch_indexes))
 
                     scores = Uscores + Rscores + Mscores + Fscores
 
@@ -171,7 +175,7 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
                         max_index = np.argmax(scores)
 
                     #add the index to the set
-                    self.batch_indexes = np.append(self.batch_indexes,self.set_indexes[max_index])
+                    self.batch_indexes = np.append(self.batch_indexes,subset_indexes[max_index])
                     #remove the index from the indexes
                     self.set_indexes = np.delete(self.set_indexes,max_index)
 
@@ -213,9 +217,12 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
             print("Collecting Activations")
             imgs = tf.cast(self.imgs[self.set_indexes],'float32')
         
-            inter_model = Model(inputs=model.input, outputs=[model.get_layer(layer_name).output,model.output])
-            local_activations,preds = inter_model.predict(imgs,batch_size = 128)
-            del inter_model
+            #inter_model = Model(inputs=model.input, outputs=[model.get_layer(layer_name).output,model.output])
+            #local_activations,preds = inter_model.predict(imgs,batch_size = 128)
+            #del inter_model
+
+            preds,local_activations = model.predict(imgs,batch_size = 128)
+            print(local_activations.shape)
 
             #modify indexes of outputs to maintain the order of the images
             #from [0,2,4] to [n,0,n,0,n,0] ect

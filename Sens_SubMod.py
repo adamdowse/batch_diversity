@@ -22,7 +22,7 @@ def main():
     @tf.function
     def train_step(imgs,labels):
         with tf.GradientTape() as tape:
-            preds = model(imgs,training=True)
+            preds = model(imgs,training=True)[0]
             loss = loss_func(labels,preds)
 
         grads = tape.gradient(loss,model.trainable_variables)
@@ -37,7 +37,7 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 1,
@@ -73,7 +73,7 @@ def main():
 
     #Model
     tf.keras.backend.clear_session()
-    model = sm.select_model(config['model_name'],train_DG.num_classes,train_DG.img_size,config['weight_decay'])
+    model = sm.select_model(config['model_name'],train_DG.num_classes,train_DG.img_size,config['weight_decay'],getLLactivations=True)
     model.build(train_DG.img_size+(1,))
     model.summary()
 
@@ -157,7 +157,7 @@ def main():
         batch_num += train_DG.num_batches
 
         #FIM Analysis
-        train_DG.get_data_subset(model,train_ds,defect=False)
+        train_DG.Epoch_init(True)
         FIM_trace = fim.FIM_trace(train_DG,train_DG.num_classes,model) #return the approximate trace of the FIM
 
         #Log FIM
