@@ -37,7 +37,7 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 1,
@@ -62,13 +62,14 @@ def main():
         'train_type' : 'SubMod', #SubMod, Random
         'activation_delay' : 5, #cannot be 0 (used when submod is used)
         'activation_layer_name' : 'fc',
+        'lambdas' : [0.2,0.1,0.5,0.2],
     }
 
     #Setup
     wandb.init(project='FIM_Sensitivity',config=config)
 
     #Data Generator
-    train_DG = DataGens.LocalSubModDataGen(config['ds_name'],config['batch_size'],config['test_percent'],config['ds_path'],lambdas=[0.2,0.2,0.2,0.2])
+    train_DG = DataGens.LocalSubModDataGen(config['ds_name'],config['batch_size'],config['test_percent'],config['ds_path'],lambdas=config['lambdas'])
     test_DG = DataGens.TestDataGen(config['ds_name'], 50, config['test_percent'], config['ds_path'])
 
     #Model
