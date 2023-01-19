@@ -20,13 +20,10 @@ import os
 def main():
 
     @tf.function
-    def train_step(imgs,labels,beta):
+    def train_step(imgs,labels):
         with tf.GradientTape() as tape:
             preds = model(imgs,training=True)
             loss = loss_func(labels,preds)
-            #add l2 norm of all weights to loss
-            #for w in model.trainable_weights:
-            #    loss += beta * tf.nn.l2_loss(w)
 
         grads = tape.gradient(loss,model.trainable_variables)
         optimizer.apply_gradients(zip(grads,model.trainable_variables))
@@ -40,12 +37,12 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 1,
         'test_percent' : 1,
-        'group' : 'cifar10_10-0.5defect',
+        'group' : 'cifar10_10-submod',
         'model_name' : 'ResNet18',
         'learning_rate' : 0.1,
         'learning_rate_decay' : 0.97,
@@ -63,23 +60,21 @@ def main():
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'SubMod', #SubMod, Random
-        'activations_delay' : 5, #cannot be 0 (used when submod is used)
+        'activation_delay' : 5, #cannot be 0 (used when submod is used)
         'activation_layer_name' : 'fc',
     }
 
     #Setup
     wandb.init(project='FIM_Sensitivity',config=config)
-    test_ds,ds_info,conn_path, train_ds = sf.setup_db(config)
 
-    num_classes = ds_info.features['label'].num_classes
-    class_names = ds_info.features['label'].names
-    img_size = ds_info.features['image'].shape
-    num_train_imgs = ds_info.splits['train[:'+str(int(config['train_percent']*100))+'%]'].num_examples
+    #Data Generator
+    train_DG = DataGens.LocalSubModDataGen(config['ds_name'],config['batch_size'],config['test_percent'],config['ds_path'],lambdas=[0.2,0.2,0.2,0.2])
+    test_DG = DataGens.TestDataGen(config['ds_name'], 50, config['test_percent'], config['ds_path'])
 
     #Model
     tf.keras.backend.clear_session()
-    model = sm.select_model(config['model_name'],num_classes,img_size,config['weight_decay'])
-    model.build(img_size+(1,))
+    model = sm.select_model(config['model_name'],train_DG.num_classes,train_DG.img_size,config['weight_decay'])
+    model.build(train_DG.img_size+(1,))
     model.summary()
 
     #Loss
@@ -97,7 +92,7 @@ def main():
     else:
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             config['learning_rate'],
-            decay_steps=num_train_imgs/config['batch_size'],
+            decay_steps=train_DG.num_images/config['batch_size'],
             decay_rate=config['learning_rate_decay'],
             staircase=True)
 
@@ -110,9 +105,7 @@ def main():
     else:
         print('Optimizer not recognised')     
 
-    #Data Generator
-    train_DG = sf.LocalSubModDataGen(conn_path,config)
-    test_DG = sf.TestDataGen(test_ds, 50, num_classes)
+    
 
     #Compile Model
     model.compile(optimizer=optimizer,loss=loss_func,metrics=['accuracy',tf.keras.metrics.Precision(),tf.keras.metrics.Recall()])
@@ -124,8 +117,7 @@ def main():
     epoch_num = 0
     while batch_num < config['max_its']:
         epoch_num += 1
-        print('Batch Number: ',batch_num)
-        print('Epoch Number: ',epoch_num)
+        print('Epoch #: ',epoch_num,' Batch #: ',batch_num)
 
         #reset metrics
         train_loss.reset_states()
@@ -134,7 +126,6 @@ def main():
         train_rec_metric.reset_states()
 
         #Scores the training data and decides what to train on
-        print('Init DG-Epoch')
         if epoch_num > config['start_defect_epoch'] and epoch_num < config['start_defect_epoch']+config['defect_length']:
             #this initilises the data generator with the defect data 
             train_DG.Epoch_init(False)
@@ -148,9 +139,12 @@ def main():
         print('Training')
         for i in range(train_DG.num_batches):
             #get the activations for the next batch selection
-            train_DG.get_activations(model,i)
+            train_DG.get_activations(model,i,config["activation_layer_name"],config["activation_delay"])
+            t1 = time.time()
             batch_data = train_DG.__getitem__(i)
+            t = time.time()
             train_step(batch_data[0],batch_data[1])
+            print('Get data: ',t-t1,'train step time: ',time.time() - t)
             
         #Test on the test data
         print('Evaluating')
@@ -164,7 +158,7 @@ def main():
 
         #FIM Analysis
         train_DG.get_data_subset(model,train_ds,defect=False)
-        FIM_trace = fim.FIM_trace(train_DG,num_classes,model) #return the approximate trace of the FIM
+        FIM_trace = fim.FIM_trace(train_DG,train_DG.num_classes,model) #return the approximate trace of the FIM
 
         #Log FIM
         print('FIM Trace: ',FIM_trace)
