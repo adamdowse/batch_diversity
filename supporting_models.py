@@ -194,9 +194,10 @@ def build_resnet(x,vars,num_classes,REG=0):
         x = make_layer(x, 256, blocks_per_layer[2], stride=2, name='layer3')
         x = make_layer(x, 512, blocks_per_layer[3], stride=2, name='layer4')
 
-        a = layers.Flatten()(x)
+        
 
         x = layers.GlobalAveragePooling2D(name='avgpool')(x)
+        a = layers.Flatten()(x)
         initializer = keras.initializers.RandomUniform(-1.0 / math.sqrt(512), 1.0 / math.sqrt(512))
         x = layers.Dense(units=num_classes, kernel_initializer=initializer, bias_initializer=initializer, name='fc')(x)
         x = layers.Softmax(name='softmax')(x)

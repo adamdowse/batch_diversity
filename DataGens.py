@@ -177,6 +177,7 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
                     #add the index to the set
                     self.batch_indexes = np.append(self.batch_indexes,subset_indexes[max_index])
                     #remove the index from the indexes
+                    subset_indexes = np.delete(subset_indexes,max_index)
                     self.set_indexes = np.delete(self.set_indexes,max_index)
 
 
