@@ -15,6 +15,8 @@ import os
 import wandb
 import matplotlib.pyplot as plt
 import time
+import copy
+from multiprocessing.pool import ThreadPool
 
 
 def imgsAndLabelsFromTFDataset(DS):
@@ -55,12 +57,12 @@ def Redundancy_Score(activations,set_indexes,batch_indexes):
     else:
         return np.zeros(len(set_indexes))
 
-def Mean_Close_Score(activations,set_indexes):
+def Mean_Close_Score(activations,set_indexes,class_mean):
     #calculate the mean close score for each image in the database
     #the selected points should be as close to the mean of the total data as possible
 
     #calculate the mean close score
-    d = cdist([np.mean(activations,axis=0)],activations[set_indexes],metric='sqeuclidean')
+    d = cdist([class_mean],activations[set_indexes],metric='sqeuclidean')
     return -np.squeeze(d)
 
 def Feature_Match_Score(activations,set_indexes,batch_indexes):
@@ -146,6 +148,54 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
                 self.batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
 
         else:
+            #This is the new version with partitioning
+            set_size = len(self.set_indexes)
+            num_partitions = 5
+            ltl_log_ep = 5
+
+            if set_size >= num_partitions*self.batch_size:
+                #use the multiprocessing methods
+                part_size = int(set_size / num_partitions)
+                r_size = int((part_size * ltl_log_ep)/ self.batch_size) #this is how many indexes to sample to reduce cost
+                random.shuffle(self.set_indexes)
+                print(part_size)
+                print(set_size)
+                partitions = [self.set_indexes[k:k+part_size] for k in range(0,set_size,part_size)] #splitting set indexes into parts
+
+                pool = ThreadPool(processes=len(partitions))
+                pool_handlers = []
+                for partition in partitions:
+                    handler = pool.apply_async(get_subset_indices, args=(partition, self.activations,self.preds,self.batch_size,r_size,self.lambdas))
+                    pool_handlers.append(handler)
+                pool.close()
+                pool.join()
+
+                intermediate_indices = []
+                for handler in pool_handlers:
+                    intermediate_indices.extend(handler.get())
+            
+            else:
+                intermediate_indices = self.set_indexes
+            
+            r_size = int(len(intermediate_indices) / self.batch_size * ltl_log_ep)
+
+            #now do submod on the combined set
+            batch_indexes = get_subset_indices(intermediate_indices,self.activations,self.preds,self.batch_size,r_size,self.lambdas)
+
+            for item in batch_indexes:
+                self.set_indexes.remove(item)
+
+        #get the data for the batch
+        imgs = self.imgs[self.batch_indexes]
+        labels = self.labels[self.batch_indexes]
+
+        #convert to tensors
+        imgs = tf.cast(np.array(imgs),'float32') 
+        labels = tf.one_hot(np.array(labels),self.num_classes)
+
+
+        '''
+
             #gets the indexes of the images to use in the next batch and removes them from the set of available images
             self.batch_indexes = np.array([],dtype=int)
 
@@ -191,6 +241,8 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
 
         #reset the set indexes
         self.batch_indexes = np.array([],dtype=int)
+
+        '''
         return (imgs, labels,)
 
     def __len__(self):
@@ -234,8 +286,41 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
                 self.preds[idx] = preds[count]
 
 
+def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lambdas):
+    if r_size < len(index_set_input):
+        index_set = np.random.choice(index_set_input,r_size, replace=False)
+    else:
+        index_set = copy.deepcopy(index_set_input)
+    
+    print(index_set)
+
+    subset_indices = []
+
+    class_mean = np.mean(activations, axis=0)
+
+    subset_size = min(subset_size,len(index_set))
 
 
+    for i in range(0, subset_size):
+        if r_size < len(index_set):
+            index_set = np.random.choice(index_set,r_size,replace=False)
         
+
+        Uscores = lambdas[0] * Norm(Uncertainty_Score(preds,subset_indices))
+        Rscores = lambdas[1] * Norm(Redundancy_Score(activations,subset_indices,index_set))
+        Mscores = lambdas[2] * Norm(Mean_Close_Score(activations,subset_indices,class_mean))
+        Fscores = lambdas[3] * Norm(Feature_Match_Score(activations,subset_indices,index_set))
+
+        scores = Uscores + Rscores + Mscores + Fscores
+        print(scores)
+        #get the index of the image with the highest score
+        max_index = np.argmax(scores)
+        
+        subset_indices.append(index_set[max_index])
+        index_set = np.delete(index_set,max_index,axis=0)
+
+    return subset_indices
+
+            
 
 
