@@ -182,12 +182,15 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
             #now do submod on the combined set
             batch_indexes = get_subset_indices(intermediate_indices,self.activations,self.preds,self.batch_size,r_size,self.lambdas)
 
+            self.set_indexes = self.set_indexes.tolist()
             for item in batch_indexes:
                 self.set_indexes.remove(item)
+            
+            self.set_indexes = np.array(self.set_indexes)
 
         #get the data for the batch
-        imgs = self.imgs[self.batch_indexes]
-        labels = self.labels[self.batch_indexes]
+        imgs = self.imgs[batch_indexes]
+        labels = self.labels[batch_indexes]
 
         #convert to tensors
         imgs = tf.cast(np.array(imgs),'float32') 
@@ -291,8 +294,6 @@ def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lamb
         index_set = np.random.choice(index_set_input,r_size, replace=False)
     else:
         index_set = copy.deepcopy(index_set_input)
-    
-    print(index_set)
 
     subset_indices = []
 
@@ -306,13 +307,12 @@ def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lamb
             index_set = np.random.choice(index_set,r_size,replace=False)
         
 
-        Uscores = lambdas[0] * Norm(Uncertainty_Score(preds,subset_indices))
-        Rscores = lambdas[1] * Norm(Redundancy_Score(activations,subset_indices,index_set))
-        Mscores = lambdas[2] * Norm(Mean_Close_Score(activations,subset_indices,class_mean))
-        Fscores = lambdas[3] * Norm(Feature_Match_Score(activations,subset_indices,index_set))
+        Uscores = lambdas[0] * Norm(Uncertainty_Score(preds,index_set))
+        Rscores = lambdas[1] * Norm(Redundancy_Score(activations,index_set,subset_indices))
+        Mscores = lambdas[2] * Norm(Mean_Close_Score(activations,index_set,class_mean))
+        Fscores = lambdas[3] * Norm(Feature_Match_Score(activations,index_set,subset_indices))
 
         scores = Uscores + Rscores + Mscores + Fscores
-        print(scores)
         #get the index of the image with the highest score
         max_index = np.argmax(scores)
         
