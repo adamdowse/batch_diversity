@@ -15,8 +15,8 @@ error = $ENV(PWD)/condor/c$(cluster).p$(process).error
 +JobRunTime = 5
 
 request_GPUs = 1
-+GPUMem = 8000
++GPUMem = 16000
 request_CPUs = 4
-request_memory = 8000
+request_memory = 16000
 
 queue 1

@@ -143,9 +143,9 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
         #build a batch via submodular selection
         if self.StandardOveride:
             if len(self.random_batch_indexes[index*self.batch_size:]) < self.batch_size: 
-                self.batch_indexes = self.random_batch_indexes[index*self.batch_size:]
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:]
             else:
-                self.batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
 
         else:
             #This is the new version with partitioning
