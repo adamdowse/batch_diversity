@@ -102,7 +102,7 @@ class TestDataGen(tf.keras.utils.Sequence):
         
         
     def __getitem__(self, index):
-        return (tf.cast(self.imgs[index],'float32'), tf.one_hot(np.array(self.labels[index])),)
+        return (tf.cast(self.imgs[index],'float32'), tf.one_hot(self.labels[index],self.num_classes),)
     
     def __len__(self):
         return self.num_batches

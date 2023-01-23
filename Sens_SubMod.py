@@ -14,9 +14,6 @@ import tracemalloc
 import os
 
 
-
-#run a standard model with the trace FIM recorded each epoch
-
 def main():
 
     @tf.function
@@ -32,12 +29,23 @@ def main():
         train_prec_metric(labels,preds)
         train_rec_metric(labels,preds)
         return
+    
+    @tf.function
+    def test_step(imgs,labels):
+        with tf.GradientTape() as tape:
+            preds = model(imgs,training=False)[0]
+            loss = loss_func(labels,preds)
+        test_loss(loss)
+        test_acc_metric(labels,preds)
+        test_prec_metric(labels,preds)
+        test_rec_metric(labels,preds)
+
 
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
         'train_percent' : 1,
@@ -87,6 +95,11 @@ def main():
     train_prec_metric = tf.keras.metrics.Precision(name='train_precision')
     train_rec_metric = tf.keras.metrics.Recall(name='train_recall')
 
+    test_loss = tf.keras.metrics.Mean(name='test_loss')
+    test_acc_metric = tf.keras.metrics.CategoricalAccuracy(name='test_accuracy')
+    test_prec_metric = tf.keras.metrics.Precision(name='test_precision')
+    test_rec_metric = tf.keras.metrics.Recall(name='test_recall')
+
     #Optimizer
     if config['learning_rate_decay'] == 1 or config['learning_rate_decay'] == 0:
         lr_schedule = config['learning_rate']
@@ -125,6 +138,10 @@ def main():
         train_acc_metric.reset_states()
         train_prec_metric.reset_states()
         train_rec_metric.reset_states()
+        test_loss.reset_states()
+        test_acc_metric.reset_states()
+        test_prec_metric.reset_states()
+        test_rec_metric.reset_states()
 
         #Scores the training data and decides what to train on
         if epoch_num > config['start_defect_epoch'] and epoch_num < config['start_defect_epoch']+config['defect_length']:
@@ -149,11 +166,13 @@ def main():
             
         #Test on the test data
         print('Evaluating')
-        test_metrics = model.evaluate(test_DG)
+        for i in range(test_DG.num_batches):
+            batch_data = test_DG.__getitem__(i)
+            test_step(batch_data[0],batch_data[1])
 
         #Log metrics
         wandb.log({'Train_loss':train_loss.result(),'Train_acc':train_acc_metric.result(),'Train_prec':train_prec_metric.result(),'Train_rec':train_rec_metric.result()},step=batch_num)
-        wandb.log({'Test_loss':test_metrics[0],'Test_acc':test_metrics[1],'Test_prec':test_metrics[2],'Test_rec':test_metrics[3]},step=batch_num)
+        wandb.log({'Test_loss':test_loss.result(),'Test_acc':test_acc_metric.result(),'Test_prec':test_prec_metric.result(),'Test_rec':test_rec_metric.result()},step=batch_num)
         wandb.log({'Epoch':epoch_num},step=batch_num)
         batch_num += train_DG.num_batches
 
