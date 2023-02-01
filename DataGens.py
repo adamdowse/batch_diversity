@@ -321,10 +321,10 @@ def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lamb
 
 
 #Diversity batch data gen
-class LocalSubModDataGen(tf.keras.utils.Sequence):
+class LocalDivDataGen(tf.keras.utils.Sequence):
 
     def __init__(self, ds_name, batch_size, size, ds_dir, Download=True):
-        print("Starting SubMod Data Generator")
+        print("Starting Low Diversity Data Generator")
         #pull data
         train_split = 'train[:'+str(int(size*100))+'%]' 
         train_ds, info = tfds.load(ds_name,with_info=True,shuffle_files=False,as_supervised=True,split=train_split,data_dir=ds_dir,download=Download)
@@ -335,7 +335,6 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
         self.class_names = info.features['label'].names
         self.img_size = info.features['image'].shape
         self.num_images = info.splits[train_split].num_examples
-        self.lambdas = lambdas
         self.batch_size = batch_size
 
         self.data_used = np.zeros(self.num_images,dtype=int)
@@ -358,12 +357,12 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
 
         else:
             #select a random avalible item
-            batch_index = self.set_indexes[np.randint(len(self.set_indexes))]
+            batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
 
             #fill the batch with the low diversity gradients
             #find closest n-1 grads
-            batch_indexes = self.set_indexes[np.argpartition(cdist(self.grads[self.set_indexes],self.grads[batch_index]), self.batch_size)[self.batch_size:]]
-            print(batch_indexes)
+            smallest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), self.batch_size)[:self.batch_size]
+            batch_indexes = self.set_indexes[smallest]
             
             #remove the batch indexes from the set indexes so they are not used again
             self.set_indexes = self.set_indexes.tolist()
@@ -371,7 +370,8 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
                 self.set_indexes.remove(item)
             
             self.set_indexes = np.array(self.set_indexes)
-            print(len(self.set_indexes))
+            #print("images left in superset:",len(self.set_indexes))
+            #print("images in batch:",len(batch_indexes))
 
 
         #get the data for the batch
@@ -409,7 +409,8 @@ class LocalSubModDataGen(tf.keras.utils.Sequence):
             imgs = tf.cast(self.imgs[self.set_indexes],'float32')
             labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
 
-            preds = model.predict(imgs,batch_size = 128)[0] - labels
+            grads = model.predict(imgs,batch_size = 128)[0] 
+            grads = grads - labels
 
             #modify indexes of outputs to maintain the order of the images
             #from [0,2,4] to [n,0,n,0,n,0] ect

@@ -1,6 +1,19 @@
 #A deep look at the diverstiy of gradients 
 
-
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+import FIM_analysis as fim
+import Pretrained_supporting_functions as sf
+import DataGens
+import supporting_models as sm
+import wandb
+from tensorflow import keras
+from wandb.keras import WandbCallback
+import time
+import tracemalloc
+import os
 
 
 
@@ -43,14 +56,16 @@ def main():
         'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'group' : 'cifar10_10-submod',
+        'group' : 'cifar10_fullLowDiv',
+        'train_percent' : 1,
+        'test_percent' : 1,
         'model_name' : 'ResNet18',
         'learning_rate' : 0.1,
         'learning_rate_decay' : 0.97,
         'optimizer' : 'Momentum', #SGD, Adam, Momentum
         'momentum' : 0.9,
         'random_db' : 'True', #False is wrong it adds the datasets together
-        'batch_size' : 128,
+        'batch_size' : 32,
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
@@ -60,14 +75,13 @@ def main():
         'epochs'    : 0, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
-        'train_type' : 'SubMod', #SubMod, Random
+        'train_type' : 'LowDiv', #SubMod, Random
         'activation_delay' : 5, #cannot be 0 (used when submod is used)
         'activation_layer_name' : 'fc',
     }
 
     #Setup
     wandb.init(project='Deep_Div',config=config)
-
 
     #Data Generator
     train_DG = DataGens.LocalDivDataGen(config['ds_name'],config['batch_size'],config['test_percent'],config['ds_path'])
@@ -192,3 +206,9 @@ def main():
     #Finish - clear keras backend
     tf.keras.backend.clear_session()
     print('Finished')
+
+
+if __name__ == "__main__":
+    os.environ['WANDB_API_KEY'] = 'fc2ea89618ca0e1b85a71faee35950a78dd59744'
+    wandb.login()
+    main()
