@@ -29,7 +29,6 @@ def imgsAndLabelsFromTFDataset(DS):
         labels_store.append(labels)
     return (np.array(imgs_store),np.array(labels_store),num_batches)
 
-
 def Norm(A):
     if np.sum(A) == 0:
         return A
@@ -81,9 +80,6 @@ def Feature_Match_Score(activations,set_indexes,batch_indexes):
     #    subset_scores = np.sum(softmax[batch_indexes],axis=0)
     #    return np.sum(np.sqrt( subset_scores + softmax[indexes]),axis=1)
     return np.zeros(len(set_indexes))
-
-
-
 
 
 
@@ -322,5 +318,103 @@ def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lamb
     return subset_indices
 
             
+
+
+#Diversity batch data gen
+class LocalSubModDataGen(tf.keras.utils.Sequence):
+
+    def __init__(self, ds_name, batch_size, size, ds_dir, Download=True):
+        print("Starting SubMod Data Generator")
+        #pull data
+        train_split = 'train[:'+str(int(size*100))+'%]' 
+        train_ds, info = tfds.load(ds_name,with_info=True,shuffle_files=False,as_supervised=True,split=train_split,data_dir=ds_dir,download=Download)
+
+
+        #init db connection and init vars
+        self.num_classes = info.features['label'].num_classes
+        self.class_names = info.features['label'].names
+        self.img_size = info.features['image'].shape
+        self.num_images = info.splits[train_split].num_examples
+        self.lambdas = lambdas
+        self.batch_size = batch_size
+
+        self.data_used = np.zeros(self.num_images,dtype=int)
+        self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(train_ds)
+
+        #Logging
+        print("Number of classes: ", self.num_classes)
+        print("Number of images: ", len(self.imgs))
+        print("Batch size: ", batch_size)
+
+
+    def __getitem__(self, index):
+        #gets the next batch of data
+        #build a batch via greedy low diversity
+        if self.StandardOveride:
+            if len(self.random_batch_indexes[index*self.batch_size:]) < self.batch_size: 
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:]
+            else:
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
+
+        else:
+            #select a random avalible item
+            batch_index = self.set_indexes[np.randint(len(self.set_indexes))]
+
+            #fill the batch with the low diversity gradients
+            #find closest n-1 grads
+            batch_indexes = self.set_indexes[np.argpartition(cdist(self.grads[self.set_indexes],self.grads[batch_index]), self.batch_size)[self.batch_size:]]
+            print(batch_indexes)
+            
+            #remove the batch indexes from the set indexes so they are not used again
+            self.set_indexes = self.set_indexes.tolist()
+            for item in batch_indexes:
+                self.set_indexes.remove(item)
+            
+            self.set_indexes = np.array(self.set_indexes)
+            print(len(self.set_indexes))
+
+
+        #get the data for the batch
+        imgs = self.imgs[batch_indexes]
+        labels = self.labels[batch_indexes]
+
+        #convert to tensors
+        imgs = tf.cast(np.array(imgs),'float32') 
+        labels = tf.one_hot(np.array(labels),self.num_classes)
+        return (imgs, labels,)
+
+    def __len__(self):
+        #calculates the number of batches to use
+        return self.num_batches
+
+
+    def Epoch_init(self,StandardOveride):
+        #must be called before a training epoch
+        self.StandardOveride = StandardOveride
+        #Use all the data
+        self.set_indexes = np.arange(self.num_images)
+        self.num_batches = int(np.ceil(self.num_images/self.batch_size))
+        print('Full amount of data used, batches: ',self.num_batches)
+        if self.StandardOveride:
+            #shuffle the set indexes
+            self.random_batch_indexes = self.set_indexes
+            np.random.shuffle(self.random_batch_indexes)
+
+
+
+    def get_grads(self,model,index,layer_name,delay):
+        #get the approximate gradients from the last layer activations 
+        if index % delay == 0 and self.StandardOveride == False:
+            print("Collecting Gradients")
+            imgs = tf.cast(self.imgs[self.set_indexes],'float32')
+            labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
+
+            preds = model.predict(imgs,batch_size = 128)[0] - labels
+
+            #modify indexes of outputs to maintain the order of the images
+            #from [0,2,4] to [n,0,n,0,n,0] ect
+            self.grads = np.zeros((self.num_images,grads.shape[1]))
+            for count, idx in enumerate(self.set_indexes):
+                self.grads[idx] = grads[count]
 
 
