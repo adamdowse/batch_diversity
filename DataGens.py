@@ -356,22 +356,25 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
 
         else:
-            #select a random avalible item
-            batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
+            if len(self.set_indexes) <= self.batch_size:
+                batch_indexes = self.set_indexes
+            else:
+                #select a random avalible item
+                batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
 
-            #fill the batch with the low diversity gradients
-            #find closest n-1 grads
-            smallest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), self.batch_size)[:self.batch_size]
-            batch_indexes = self.set_indexes[smallest]
-            
-            #remove the batch indexes from the set indexes so they are not used again
-            self.set_indexes = self.set_indexes.tolist()
-            for item in batch_indexes:
-                self.set_indexes.remove(item)
-            
-            self.set_indexes = np.array(self.set_indexes)
-            #print("images left in superset:",len(self.set_indexes))
-            #print("images in batch:",len(batch_indexes))
+                #fill the batch with the low diversity gradients
+                #find closest n-1 grads
+                smallest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), self.batch_size)[:self.batch_size]
+                batch_indexes = self.set_indexes[smallest]
+                
+                #remove the batch indexes from the set indexes so they are not used again
+                self.set_indexes = self.set_indexes.tolist()
+                for item in batch_indexes:
+                    self.set_indexes.remove(item)
+                
+                self.set_indexes = np.array(self.set_indexes)
+                #print("images left in superset:",len(self.set_indexes))
+                #print("images in batch:",len(batch_indexes))
 
 
         #get the data for the batch
