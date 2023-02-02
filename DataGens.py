@@ -336,6 +336,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
         self.img_size = info.features['image'].shape
         self.num_images = info.splits[train_split].num_examples
         self.batch_size = batch_size
+        self.div_score = 0
 
         self.data_used = np.zeros(self.num_images,dtype=int)
         self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(train_ds)
@@ -354,10 +355,14 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:]
             else:
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
-
+            self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
         else:
             if len(self.set_indexes) <= self.batch_size:
                 batch_indexes = self.set_indexes
+
+                #calc div metric for batch
+                #
+                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
             else:
                 #select a random avalible item
                 batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
@@ -366,6 +371,11 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 #find closest n-1 grads
                 smallest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), self.batch_size)[:self.batch_size]
                 batch_indexes = self.set_indexes[smallest]
+
+                #calc div metric for batch
+                #
+                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
+
                 
                 #remove the batch indexes from the set indexes so they are not used again
                 self.set_indexes = self.set_indexes.tolist()
@@ -385,6 +395,9 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
         imgs = tf.cast(np.array(imgs),'float32') 
         labels = tf.one_hot(np.array(labels),self.num_classes)
         return (imgs, labels,)
+    
+    def get_div_score(self):
+        return self.div_score
 
     def __len__(self):
         #calculates the number of batches to use
@@ -407,7 +420,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
 
     def get_grads(self,model,index,layer_name,delay):
         #get the approximate gradients from the last layer activations 
-        if index % delay == 0 and self.StandardOveride == False:
+        if index % delay == 0: #and self.StandardOveride == False:
             print("Collecting Gradients")
             imgs = tf.cast(self.imgs[self.set_indexes],'float32')
             labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
