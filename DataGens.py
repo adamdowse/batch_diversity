@@ -356,6 +356,10 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
             else:
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
             self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+            self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+            
+        
+        
         else:
             if len(self.set_indexes) <= self.batch_size:
                 batch_indexes = self.set_indexes
@@ -363,6 +367,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 #calc div metric for batch
                 #
                 self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
             else:
                 #select a random avalible item
                 batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
@@ -375,6 +380,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 #calc div metric for batch
                 #
                 self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
+                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
 
                 
                 #remove the batch indexes from the set indexes so they are not used again
@@ -397,7 +403,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
         return (imgs, labels,)
     
     def get_div_score(self):
-        return self.div_score
+        return self.div_score,self.div_true
 
     def __len__(self):
         #calculates the number of batches to use

@@ -56,7 +56,7 @@ def main():
         'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'group' : 'cifar10_0.1LowDiv',
+        'group' : 'cifar10_0.1TrueDiv',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'model_name' : 'ResNet18',
@@ -69,7 +69,7 @@ def main():
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'start_defect_epoch' : 100,
+        'start_defect_epoch' : 1000,
         'defect_length' : 10000, # length of defect in epochs
         'max_its' : 46900,
         'epochs'    : 100, #if this != 0 then it will override max_its    
@@ -162,14 +162,17 @@ def main():
         
         #Train on the data subset
         print('Training')
-        score_avg = 0
+        div_score_avg = 0
+        true_div_avg = 0
         for i in range(train_DG.num_batches):
             #get the activations for the next batch selection
             train_DG.get_grads(model,i,config["activation_layer_name"],config["activation_delay"])
             t1 = time.time()
             batch_data = train_DG.__getitem__(i)
-            score_avg += train_DG.get_div_score()
-            wandb.log({'Div_score':train_DG.get_div_score()},step=batch_num)
+            div_score_avg += train_DG.get_div_score()[0]
+            true_div_avg += train_DG.get_div_score()[1]
+            wandb.log({'Div_score':train_DG.get_div_score()[0]},step=batch_num)
+            wandb.log({'Mean_Train_Div_score':train_DG.get_div_score()[1]},step=batch_num)
             t = time.time()
             train_step(batch_data[0],batch_data[1])
             print('Get data: ',t-t1,'train step time: ',time.time() - t)
@@ -182,7 +185,8 @@ def main():
             test_step(batch_data[0],batch_data[1])
 
         #Log metrics
-        wandb.log({'Epoch_Div_score':score_avg/train_DG.num_batches},step=batch_num)
+        wandb.log({'Epoch_Div_score':div_score_avg/train_DG.num_batches},step=batch_num)
+        wandb.log({'Mean_Train_Epoch_Div_score':true_div_avg/train_DG.num_batches},step=batch_num)
         wandb.log({'Train_loss':train_loss.result(),'Train_acc':train_acc_metric.result(),'Train_prec':train_prec_metric.result(),'Train_rec':train_rec_metric.result()},step=batch_num)
         wandb.log({'Test_loss':test_loss.result(),'Test_acc':test_acc_metric.result(),'Test_prec':test_prec_metric.result(),'Test_rec':test_rec_metric.result()},step=batch_num)
         wandb.log({'Epoch':epoch_num},step=batch_num)
