@@ -53,10 +53,10 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'group' : 'cifar10_0.1TrueDiv',
+        'group' : 'tests',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'model_name' : 'ResNet18',
@@ -69,7 +69,7 @@ def main():
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'start_defect_epoch' : 1000,
+        'start_defect_epoch' : 0,
         'defect_length' : 10000, # length of defect in epochs
         'max_its' : 46900,
         'epochs'    : 100, #if this != 0 then it will override max_its    
@@ -78,13 +78,14 @@ def main():
         'train_type' : 'LowDiv', #SubMod, Random
         'activation_delay' : 1, #cannot be 0 (used when submod is used)
         'activation_layer_name' : 'fc',
+        'alpha' : 0.5, 
     }
 
     #Setup
     wandb.init(project='Deep_Div',config=config)
 
     #Data Generator
-    train_DG = DataGens.LocalDivDataGen(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'])
+    train_DG = DataGens.LocalSUBMODGRADDataGen(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'],config['alpha'])
     test_DG = DataGens.TestDataGen(config['ds_name'], 50, config['test_percent'], config['ds_path'])
 
     #Model

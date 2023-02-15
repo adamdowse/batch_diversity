@@ -441,3 +441,130 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 self.grads[idx] = grads[count]
 
 
+#Diversity batch data gen
+class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
+
+    def __init__(self, ds_name, batch_size, size, ds_dir,alpha, Download=True):
+        print("Starting Low Diversity Data Generator")
+        #pull data
+        train_split = 'train[:'+str(int(size*100))+'%]' 
+        train_ds, info = tfds.load(ds_name,with_info=True,shuffle_files=False,as_supervised=True,split=train_split,data_dir=ds_dir,download=Download)
+
+
+        #init db connection and init vars
+        self.num_classes = info.features['label'].num_classes
+        self.class_names = info.features['label'].names
+        self.img_size = info.features['image'].shape
+        self.num_images = info.splits[train_split].num_examples
+        self.batch_size = batch_size
+        self.div_score = 0
+        self.alpha = alpha
+
+        self.data_used = np.zeros(self.num_images,dtype=int)
+        self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(train_ds)
+
+        #Logging
+        print("Number of classes: ", self.num_classes)
+        print("Number of images: ", len(self.imgs))
+        print("Batch size: ", batch_size)
+
+
+    def __getitem__(self, index):
+        #gets the next batch of data
+        #build a batch via greedy low diversity
+        if self.StandardOveride:
+            if len(self.random_batch_indexes[index*self.batch_size:]) < self.batch_size: 
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:]
+            else:
+                batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
+            self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+            self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+            
+        else:
+            if len(self.set_indexes) <= self.batch_size:
+                batch_indexes = self.set_indexes
+
+                #calc div metric for batch
+                #
+                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+            else:
+                #calc the mean gradient of the training set
+                mean_grad = np.mean(self.grads,axis=0)
+                batch_indexes =[]
+                while len(batch_indexes) < self.batch_size:
+                    #score the distance of the batch and the item to the true gradient
+                    if len(batch_indexes) == 0:
+                        #batch does not yet exisit so pick first item
+                        r = np.random.randint(len(self.set_indexes))
+                        batch_indexes.append(self.set_indexes[r])
+                        np.delete(self.set_indexes,r)
+                    else:
+                        #standard scoring as batch contains at least one item
+                        #batch_grad_sum = np.sum(self.grads[batch_indexes],axis=0)
+                        #batch_plus_items_grads = [(batch_grad_sum+i)/(len(batch_indexes)+1) for i in self.grads[self.set_indexes]]
+                        #D_bg = cdist(batch_plus_items_grads,[batch_grad_sum]).flatten() #dist between the mean of the batch and item to the true grad
+                        D_ib = np.min(cdist(self.grads[self.set_indexes],self.grads[batch_indexes]),axis=1) #min dist from item to item in batch
+
+                        #score = self.alpha * Norm(D_bg) + (1-self.alpha) * Norm(D_ib)
+                        score = D_ib
+                        batch_indexes.append(self.set_indexes[np.argmax(score)])
+                        np.delete(self.set_indexes, np.argmin(score))
+
+
+                #calc div metric for batch
+                #
+                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
+                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+
+                self.set_indexes = np.array(self.set_indexes)
+                #print("images left in superset:",len(self.set_indexes))
+                #print("images in batch:",len(batch_indexes))
+
+
+        #get the data for the batch
+        imgs = self.imgs[batch_indexes]
+        labels = self.labels[batch_indexes]
+
+        #convert to tensors
+        imgs = tf.cast(np.array(imgs),'float32') 
+        labels = tf.one_hot(np.array(labels),self.num_classes)
+        return (imgs, labels,)
+    
+    def get_div_score(self):
+        return self.div_score,self.div_true
+
+    def __len__(self):
+        #calculates the number of batches to use
+        return self.num_batches
+
+
+    def Epoch_init(self,StandardOveride):
+        #must be called before a training epoch
+        self.StandardOveride = StandardOveride
+        #Use all the data
+        self.set_indexes = np.arange(self.num_images)
+        self.num_batches = int(np.ceil(self.num_images/self.batch_size))
+        print('Full amount of data used, batches: ',self.num_batches)
+        if self.StandardOveride:
+            #shuffle the set indexes
+            self.random_batch_indexes = self.set_indexes
+            np.random.shuffle(self.random_batch_indexes)
+
+
+
+    def get_grads(self,model,index,layer_name,delay):
+        #get the approximate gradients from the last layer activations 
+        if index % delay == 0: #and self.StandardOveride == False:
+            print("Collecting Gradients")
+            imgs = tf.cast(self.imgs[self.set_indexes],'float32')
+            labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
+
+            grads = model.predict(imgs,batch_size = 128)[0] 
+            grads = grads - labels
+
+            #modify indexes of outputs to maintain the order of the images
+            #from [0,2,4] to [n,0,n,0,n,0] ect
+            self.grads = np.zeros((self.num_images,grads.shape[1]))
+            for count, idx in enumerate(self.set_indexes):
+                self.grads[idx] = grads[count]
