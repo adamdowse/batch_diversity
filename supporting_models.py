@@ -16,9 +16,33 @@ def Simple_CNN(num_classes,in_shape,REG):
     ])
     return model
 
+def Simple_CNN_Multi_Output(num_classes,in_shape,REG):
+    inp = keras.Input(in_shape)
+    x = layers.Conv2D(32,(3,3),activation='relu')(inp)
+    x = layers.MaxPool2D((2,2))(x)
+    x = layers.Flatten()(x)
+    a = layers.Dense(100, activation='relu')(x)
+    x = layers.Dense(num_classes)(a)
+    x = layers.Softmax()(x)
+    return keras.Model(inp,[x,a])
+
 
 def All_CNN_noBN(num_classes,in_shape):
     #cnn arch used in crittical learnning point paper
+    inp = keras.Input(in_shape)
+    x = layers.Conv2D(96,(3,3), activation='relu')(inp)
+    x = layers.Conv2D(96,(3,3), activation='relu')(x)
+    x = layers.MaxPool2D((3,3),strides=2)(x)
+    x = layers.Conv2D(192,(3,3), activation='relu')(x)
+    x = layers.Conv2D(192,(3,3), activation='relu')(x)
+    x = layers.MaxPool2D((3,3),strides=2)(x)
+    x = layers.Conv2D(192,(1,1), activation='relu')(x)
+    x = layers.Conv2D(10,(1,1), activation='relu')(x)
+    a = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(num_classes,name="last_layer")(a)
+    x = layers.Softmax()(x)
+    return keras.Model(inp,[x,a])
+
     model = tf.keras.Sequential([
         layers.Conv2D(96,(3,3), activation='relu',input_shape=in_shape),
         layers.Conv2D(96,(3,3), activation='relu'),
@@ -35,16 +59,15 @@ def All_CNN_noBN(num_classes,in_shape):
     return model
 
 def FullyConnected(num_classes,in_shape):
-    model = tf.keras.Sequential([
-        layers.Flatten(input_shape=in_shape),
-        layers.Dense(2000,activation='relu'),
-        layers.Dense(1500,activation='relu'),
-        layers.Dense(1000,activation='relu'),
-        layers.Dense(500,activation='relu'),
-        layers.Dense(num_classes,name="last_layer"),
-        layers.Softmax()
-    ])
-    return model
+    inp = keras.Input(in_shape)
+    x = layers.Flatten()(inp)
+    x = layers.Dense(1000,activation='relu')(x)
+    x = layers.Dense(500,activation='relu')(x)
+    x = layers.Dense(250,activation='relu')(x)
+    a = layers.Dense(30,activation='relu')(x)
+    x = layers.Dense(num_classes,name="last_layer")(a)
+    x = layers.Softmax()(x)
+    return keras.Model(inp,[x,a])
 
 
 def AlexNet (num_classes,in_shape):
@@ -123,6 +146,8 @@ def ResNet18(num_classes,in_shape,REG):
 def select_model(model_name,num_classes,img_shape,REG=0,getLLactivations=False):
     if model_name == 'Simple_CNN':
         return Simple_CNN(num_classes,img_shape,REG)
+    if model_name == 'Simple_CNN_Multi_Output':
+        return Simple_CNN_Multi_Output(num_classes,img_shape,REG)
     if model_name == 'AlexNet':
         return AlexNet(num_classes,img_shape)
     if model_name == 'EfficientNetV2B0_pretrained':
