@@ -18,6 +18,8 @@ def Simple_CNN(num_classes,in_shape,REG):
 
 def Simple_CNN_Multi_Output(num_classes,in_shape,REG):
     inp = keras.Input(in_shape)
+    x = layers.Conv2D(96,(3,3),activation='relu')(inp)
+    x = layers.MaxPool2D((2,2))(x)
     x = layers.Conv2D(32,(3,3),activation='relu')(inp)
     x = layers.MaxPool2D((2,2))(x)
     x = layers.Flatten()(x)
@@ -42,21 +44,6 @@ def All_CNN_noBN(num_classes,in_shape):
     x = layers.Dense(num_classes,name="last_layer")(a)
     x = layers.Softmax()(x)
     return keras.Model(inp,[x,a])
-
-    model = tf.keras.Sequential([
-        layers.Conv2D(96,(3,3), activation='relu',input_shape=in_shape),
-        layers.Conv2D(96,(3,3), activation='relu'),
-        layers.MaxPool2D((3,3),strides=2),
-        layers.Conv2D(192,(3,3), activation='relu'),
-        layers.Conv2D(192,(3,3), activation='relu'),
-        layers.MaxPool2D((3,3),strides=2),
-        layers.Conv2D(192,(1,1), activation='relu'),
-        layers.Conv2D(10,(1,1), activation='relu'),
-        layers.GlobalAveragePooling2D(),
-        layers.Dense(num_classes,name="last_layer"),
-        layers.Softmax()
-    ])
-    return model
 
 def FullyConnected(num_classes,in_shape):
     inp = keras.Input(in_shape)

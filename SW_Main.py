@@ -53,8 +53,8 @@ def main():
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'group' : 'mnist1_k0.5',
-        'model_name' : 'All_CNN_noBN',
-        'learning_rate' : 0.0001,
+        'model_name' : 'Simple_CNN_Multi_Output',
+        'learning_rate' : 0.001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
