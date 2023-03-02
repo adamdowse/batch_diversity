@@ -22,7 +22,7 @@ def main():
     @tf.function
     def train_step(imgs,labels):
         with tf.GradientTape() as tape:
-            preds = model(imgs,training=True)[0]
+            preds = model(imgs,training=True)
             loss = loss_func(labels,preds)
 
         grads = tape.gradient(loss,model.trainable_variables)
@@ -36,7 +36,7 @@ def main():
     @tf.function
     def test_step(imgs,labels):
         with tf.GradientTape() as tape:
-            preds = model(imgs,training=False)[0]
+            preds = model(imgs,training=False)
             loss = loss_func(labels,preds)
         test_loss(loss)
         test_acc_metric(labels,preds)
@@ -50,13 +50,13 @@ def main():
         'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "mnist",
-        'train_percent' : 0.1,
-        'test_percent' : 0.1,
-        'group' : 'mnist1_k0.5',
-        'model_name' : 'Simple_CNN_Multi_Output',
-        'learning_rate' : 0.001,
-        'learning_rate_decay' : 0,
-        'optimizer' : 'SGD', #SGD, Adam, Momentum
+        'train_percent' : 1,
+        'test_percent' : 1,
+        'group' : 'full_SOTA',
+        'model_name' : 'CIFAR10_ViT',
+        'learning_rate' : 0.01,
+        'learning_rate_decay' : 0.97,
+        'optimizer' : 'Adam', #SGD, Adam, Momentum
         'momentum' : 0,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
@@ -76,7 +76,7 @@ def main():
     }
 
     #Setup
-    wandb.init(project='MNIST_Sens',config=config)
+    wandb.init(project='CIFAR10_Sens',config=config)
 
     #Data Generator
     if config['subset_type'] == 'Easy_Mining': isEasy = True
@@ -111,7 +111,7 @@ def main():
     else:
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             config['learning_rate'],
-            decay_steps=num_train_imgs/config['batch_size'],
+            decay_steps=train_DG.num_images/config['batch_size'],
             decay_rate=config['learning_rate_decay'],
             staircase=True)
 

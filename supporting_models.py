@@ -5,6 +5,7 @@ from keras import layers
 import math
 
 
+
 def Simple_CNN(num_classes,in_shape,REG):
     model = tf.keras.Sequential([
         layers.Conv2D(32,(3,3), activation='relu',input_shape=in_shape,kernel_regularizer=tf.keras.regularizers.l2(REG)),
@@ -16,12 +17,24 @@ def Simple_CNN(num_classes,in_shape,REG):
     ])
     return model
 
-def Simple_CNN_Multi_Output(num_classes,in_shape,REG):
+def Simple_CNN_Multi_Output(num_classes,in_shape,REG): 
     inp = keras.Input(in_shape)
-    x = layers.Conv2D(96,(3,3),activation='relu')(inp)
+    x = layers.Conv2D(192,(3,3),activation='relu')(inp)
+    x = layers.BatchNormalization()(x)
     x = layers.MaxPool2D((2,2))(x)
-    x = layers.Conv2D(32,(3,3),activation='relu')(inp)
+
+    x = layers.Conv2D(96,(3,3),activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    #x = layers.MaxPool2D((2,2))(x)
+
+    x = layers.Conv2D(96,(3,3),activation='relu')(x)
+    x = layers.BatchNormalization()(x)
     x = layers.MaxPool2D((2,2))(x)
+
+    x = layers.Conv2D(32,(3,3),activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D((2,2))(x)
+    
     x = layers.Flatten()(x)
     a = layers.Dense(100, activation='relu')(x)
     x = layers.Dense(num_classes)(a)
@@ -128,30 +141,6 @@ def ResNet18(num_classes,in_shape,REG):
     
 
 
-
-
-def select_model(model_name,num_classes,img_shape,REG=0,getLLactivations=False):
-    if model_name == 'Simple_CNN':
-        return Simple_CNN(num_classes,img_shape,REG)
-    if model_name == 'Simple_CNN_Multi_Output':
-        return Simple_CNN_Multi_Output(num_classes,img_shape,REG)
-    if model_name == 'AlexNet':
-        return AlexNet(num_classes,img_shape)
-    if model_name == 'EfficientNetV2B0_pretrained':
-        return EfficientNetV2B0_pretrained(num_classes,img_shape)
-    if model_name == 'ResNet50':
-        return ResNet50(num_classes,img_shape)
-    if model_name == 'ResNet101':
-        return ResNet101(num_classes,img_shape)
-    if model_name == 'ResNet18':
-        return ResNet18(num_classes,img_shape,REG)
-    if model_name == 'All_CNN_noBN':
-        return All_CNN_noBN(num_classes,img_shape)
-    if model_name == 'FullyConnected':
-        return FullyConnected(num_classes,img_shape)
-
-
-
 def build_resnet(x,vars,num_classes,REG=0):
     kaiming_normal = keras.initializers.VarianceScaling(scale=2.0, mode='fan_out', distribution='untruncated_normal')
 
@@ -215,3 +204,119 @@ def build_resnet(x,vars,num_classes,REG=0):
         x = layers.Softmax(name='softmax')(x)
         return x,a
     return resnet(x, vars,num_classes)
+
+def CIFAR10_ViT(num_classes,in_shape):
+    image_size = 72
+    patch_size = 6
+    num_patches = (image_size//patch_size)**2
+    projection_dim = 64
+    num_heads = 4
+    transformer_units = [projection_dim * 2, projection_dim,]
+    transformer_layers = 8
+    mlp_head_units = [2048,1024]
+
+    return ViT(num_classes,in_shape,image_size,patch_size,num_patches,projection_dim,num_heads,transformer_units,transformer_layers,mlp_head_units)
+
+def ViT(num_classes,in_shape,image_size,patch_size,num_patches,projection_dim,num_heads,transformer_units,transformer_layers,mlp_head_units):
+
+    data_augmentation = keras.Sequential(
+        [
+            layers.Normalization(),
+            layers.Resizing(image_size,image_size),
+            layers.RandomFlip("horizontal"),
+            layers.RandomRotation(factor=0.02),
+            layers.RandomZoom(
+                height_factor=0.2, width_factor=0.2
+            ),
+        ],
+        name="data_augmentation"
+    )
+    #data_augmentaion.layers[0].adapt(x_train) #THIS NEEDS FIXING
+
+    def mlp(x, hidden_units, dropout_rate):
+        for units in hidden_units:
+            x = layers.Dense(units, activation=tf.nn.gelu)(x)
+            x = layers.Dropout(dropout_rate)(x)
+        return x
+
+    class Patches(layers.Layer):
+        def __init__(self, patch_size):
+            super().__init__()
+            self.patch_size = patch_size
+        
+        def call(self, images):
+            batch_size = tf.shape(images)[0]
+            patches = tf.image.extract_patches(
+                images = images,
+                sizes  = [1,self.patch_size, self.patch_size, 1],
+                strides= [1,self.patch_size, self.patch_size, 1],
+                rates  = [1,1,1,1],
+                padding= "VALID",
+            )
+            patch_dims = patches.shape[-1]
+            patches = tf.reshape(patches, [batch_size, -1, patch_dims])
+            return patches
+
+    class PatchEncoder(layers.Layer):
+        def __init__(self,num_patches,projection_dim):
+            super().__init__()
+            self.num_patches = num_patches
+            self.projection = layers.Dense(units=projection_dim)
+            self.position_embedding = layers.Embedding(
+                input_dim=num_patches, output_dim=projection_dim
+            )
+
+        def call(self, patch):
+            positions = tf.range(start=0, limit=self.num_patches, delta=1)
+            encoded = self.projection(patch) + self.position_embedding(positions)
+            return encoded
+    
+    inputs = layers.Input(shape=in_shape)
+    augmented = data_augmentation(inputs)
+    patches = Patches(patch_size)(augmented)
+    encoded_patches = PatchEncoder(num_patches,projection_dim)(patches)
+
+    for _ in range(transformer_layers):
+        x1 = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
+        attention_output = layers.MultiHeadAttention(
+            num_heads=num_heads, key_dim=projection_dim, dropout=0.1
+        )(x1,x1)
+
+        x2 = layers.Add()([attention_output,encoded_patches])
+        x3 = layers.LayerNormalization(epsilon=1e-6)(x2)
+        x3 = mlp(x3, hidden_units=transformer_units, dropout_rate=0.1)
+        encoded_patches = layers.Add()([x3,x2])
+    
+    representation = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
+    representation = layers.Flatten()(representation)
+    representation = layers.Dropout(0.5)(representation)
+
+    features = mlp(representation, hidden_units=mlp_head_units, dropout_rate=0.5)
+    logits = layers.Dense(num_classes)(features)
+    sm = layers.Softmax()(logits)
+    return keras.Model(inputs=inputs,outputs=sm)
+
+
+
+
+def select_model(model_name,num_classes,img_shape,REG=0,getLLactivations=False):
+    if model_name == 'CIFAR10_ViT':
+        return CIFAR10_ViT(num_classes,img_shape)
+    if model_name == 'Simple_CNN':
+        return Simple_CNN(num_classes,img_shape,REG)
+    if model_name == 'Simple_CNN_Multi_Output':
+        return Simple_CNN_Multi_Output(num_classes,img_shape,REG)
+    if model_name == 'AlexNet':
+        return AlexNet(num_classes,img_shape)
+    if model_name == 'EfficientNetV2B0_pretrained':
+        return EfficientNetV2B0_pretrained(num_classes,img_shape)
+    if model_name == 'ResNet50':
+        return ResNet50(num_classes,img_shape)
+    if model_name == 'ResNet101':
+        return ResNet101(num_classes,img_shape)
+    if model_name == 'ResNet18':
+        return ResNet18(num_classes,img_shape,REG)
+    if model_name == 'All_CNN_noBN':
+        return All_CNN_noBN(num_classes,img_shape)
+    if model_name == 'FullyConnected':
+        return FullyConnected(num_classes,img_shape)
