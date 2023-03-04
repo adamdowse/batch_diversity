@@ -47,9 +47,9 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
-        'ds_name' : "mnist",
+        'ds_name' : "CIFAR10",
         'train_percent' : 1,
         'test_percent' : 1,
         'group' : 'full_SOTA',
@@ -65,7 +65,7 @@ def main():
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
         'start_defect_epoch' : 1000,
         'defect_length' : 10, # length of defect in epochs
-        'max_its' : 46900,
+        'max_its' : 46900, #=100 full dataset epochs
         'epochs'    : 0, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'Easy_Mining', #Random_Bucket, Hard_Mining, All
