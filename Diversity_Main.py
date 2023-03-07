@@ -72,7 +72,7 @@ def main():
         'start_defect_epoch' : 0,
         'defect_length' : 1000, # length of defect in epochs
         'max_its' : 46900,
-        'epochs'    : 200, #if this != 0 then it will override max_its    
+        'epochs'    : 100, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'HighDiv', #SubMod, Random
@@ -85,7 +85,7 @@ def main():
     wandb.init(project='Deep_Div',config=config)
 
     #Data Generator
-    train_DG = DataGens.LocalDivDataGen(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'])
+    train_DG = DataGens.LocalSUBMODGRADDataGen(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'],config['alpha'])
     test_DG = DataGens.TestDataGen(config['ds_name'], 50, config['test_percent'], config['ds_path'])
 
     #Model

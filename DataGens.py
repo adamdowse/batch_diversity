@@ -453,6 +453,17 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 self.grads[idx] = grads[count]
 
 
+def calc_batch_div(batch_grads, mean_grad):
+    #use the gradients to calculate the diversity with measures (euclidean and cosine)
+    Euc_score = np.sum(np.sum(np.tril(cdist(batch_grads,batch_grads,'Euclidean')))) / ((len(batch_grads)**2 + len(batch_grads))/2)
+    Euc_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
+    Cos_score = np.sum(np.sum(np.tril(cdist(batch_grads,batch_grads,'Cosine')))) / ((len(batch_grads)**2 + len(batch_grads))/2)
+    Cos_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
+
+    return [Euc_score,Euc_true,Cos_score,Cos_true]
+
+
+
 #Diversity batch data gen
 class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
 
@@ -489,8 +500,9 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:]
             else:
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
-            self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
-            self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+
+            
+            self.scores = calc_batch_div(self.grads[batch_indexes], np.mean(self.grads,axis=0))
             
         else:
             if len(self.set_indexes) <= self.batch_size:
@@ -498,8 +510,7 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
 
                 #calc div metric for batch
                 #
-                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
-                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+                self.scores = calc_batch_div(self.grads[batch_indexes], np.mean(self.grads,axis=0))
             else:
                 #calc the mean gradient of the training set
                 mean_grad = np.mean(self.grads,axis=0)
@@ -526,8 +537,7 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
 
                 #calc div metric for batch
                 #
-                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
-                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+                self.scores = calc_batch_div(self.grads[batch_indexes], np.mean(self.grads,axis=0))
 
                 self.set_indexes = np.array(self.set_indexes)
                 #print("images left in superset:",len(self.set_indexes))
@@ -544,7 +554,7 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
         return (imgs, labels,)
     
     def get_div_score(self):
-        return self.div_score,self.div_true
+        return self.scores
 
     def __len__(self):
         #calculates the number of batches to use
@@ -567,19 +577,45 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
 
     def get_grads(self,model,index,layer_name,delay):
         #get the approximate gradients from the last layer activations 
-        if index % delay == 0: #and self.StandardOveride == False:
-            print("Collecting Gradients")
-            imgs = tf.cast(self.imgs[self.set_indexes],'float32')
-            labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
 
-            grads = model.predict(imgs,batch_size = 128)[0] 
-            grads = grads - labels
+        print("Collecting Gradients")
+        imgs = tf.cast(self.imgs[self.set_indexes],'float32')
+        labels = tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
 
-            #modify indexes of outputs to maintain the order of the images
-            #from [0,2,4] to [n,0,n,0,n,0] ect
-            self.grads = np.zeros((self.num_images,grads.shape[1]))
-            for count, idx in enumerate(self.set_indexes):
-                self.grads[idx] = grads[count]
+        grads = model.predict(imgs,batch_size = 128)[0] 
+        grads = grads - labels
+
+        #modify indexes of outputs to maintain the order of the images
+        #from [0,2,4] to [n,0,n,0,n,0] ect
+        self.grads = np.zeros((self.num_images,grads.shape[1]))
+        for count, idx in enumerate(self.set_indexes):
+            self.grads[idx] = grads[count]
+
+            
+
+    def fast_grad_div(self):
+        #calculate what the average random batch is doing based off Feng et al
+        #probably would do this at epoch end as fairly compy
+        #need to test both full gradients and last layer approximations
+        print("Collecting Gradients")
+
+        grads = model.predict(tf.cast(self.imgs[self.set_indexes],'float32'),batch_size = 128)[0] 
+        grads = grads - tf.one_hot(np.array(self.labels[self.set_indexes]),self.num_classes)
+
+        mean_grad = np.mean(grads,axis=0)
+
+        #(np.dot(u, v)/np.dot(v, v))*v
+        mean_dot = np.dot(mean_grad,mean_grad)
+        grads_projected = [(np.dot(u,mean_grad)/mean_dot)*mean_grad for u in grads]
+        #grads_orthoganal = grads - grads_projected
+
+        #squared distance in the direction of the mean grad
+        dist_para = [np.dot(u,u) for u in grads_projected] #this can be interpreted as a histogram 
+        #dist_perp = [np.dot(u,u) for u in grads_orthoganal]
+
+        return dist_para
+
+        
 
 
 
