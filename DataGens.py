@@ -320,7 +320,7 @@ def get_subset_indices(index_set_input,activations,preds,subset_size,r_size,lamb
             
 
 
-#Diversity batch data gen
+#Diversity batch data gen this has many problems 
 class LocalDivDataGen(tf.keras.utils.Sequence):
 
     def __init__(self, ds_name, batch_size, size, ds_dir, Download=True):
@@ -336,7 +336,10 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
         self.img_size = info.features['image'].shape
         self.num_images = info.splits[train_split].num_examples
         self.batch_size = batch_size
-        self.div_score = 0
+        self.div_euc = 0
+        self.div_cos = 0
+        self.div_euc_true = 0
+        self.div_cos_true = 0
 
         self.data_used = np.zeros(self.num_images,dtype=int)
         self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(train_ds)
@@ -355,8 +358,11 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:]
             else:
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
-            self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
-            self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+            self.div_euc = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+            self.div_euc_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+
+            self.div_cos = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes],'cosine')))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+            self.div_cos_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)],'cosine')
             
         
         
@@ -366,21 +372,27 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
 
                 #calc div metric for batch
                 #
-                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
-                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+                self.div_euc = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+                self.div_euc_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+
+                self.div_cos = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes],'cosine')))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+                self.div_cos_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)],'cosine')
             else:
                 #select a random avalible item
                 batch_index = self.set_indexes[np.random.randint(len(self.set_indexes))]
 
                 #fill the batch with the low diversity gradients
                 #find closest n-1 grads
-                smallest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), self.batch_size)[:self.batch_size]
-                batch_indexes = self.set_indexes[smallest]
+                largest = np.argpartition(np.array(cdist(self.grads[self.set_indexes],[self.grads[batch_index]])).flatten(), -self.batch_size)[-self.batch_size:]
+                batch_indexes = self.set_indexes[largest]
 
                 #calc div metric for batch
                 #
-                self.div_score = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
-                self.div_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+                self.div_euc = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes])))) / ((self.batch_size**2 + self.batch_size)/2)
+                self.div_euc_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)])
+
+                self.div_cos = np.sum(np.sum(np.tril(cdist(self.grads[batch_indexes],self.grads[batch_indexes],'cosine')))) / ((len(batch_indexes)**2 + len(batch_indexes))/2)
+                self.div_cos_true = cdist([np.mean(self.grads[batch_indexes],axis=0)],[np.mean(self.grads,axis=0)],'cosine')
 
                 
                 #remove the batch indexes from the set indexes so they are not used again
@@ -403,7 +415,7 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
         return (imgs, labels,)
     
     def get_div_score(self):
-        return self.div_score,self.div_true
+        return self.div_euc,self.div_euc_true,self.div_cos,self.div_cos_true
 
     def __len__(self):
         #calculates the number of batches to use
