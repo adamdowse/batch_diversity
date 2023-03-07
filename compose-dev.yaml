@@ -11,4 +11,10 @@ services:
     - type: bind
       source: /var/run/docker.sock
       target: /var/run/docker.sock
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
 
