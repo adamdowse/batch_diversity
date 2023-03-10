@@ -53,10 +53,10 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'group' : 'High_Div',
+        'group' : 'High_Cos_Div',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'model_name' : 'ResNet18',
@@ -72,7 +72,7 @@ def main():
         'start_defect_epoch' : 0,
         'defect_length' : 1000, # length of defect in epochs
         'max_its' : 46900,
-        'epochs'    : 100, #if this != 0 then it will override max_its    
+        'epochs'    : 200, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
         'train_type' : 'HighDiv', #SubMod, Random
