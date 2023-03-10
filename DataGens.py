@@ -461,7 +461,8 @@ def calc_batch_div(batch_grads, mean_grad):
     Euc_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
 
     
-    Cos_score = np.tril(cdist(batch_grads,batch_grads,'Cosine')) 
+    Cos_score = np.nan_to_num(np.tril(cdist(batch_grads,batch_grads,'Cosine')))
+
     Cos_score = np.sum(np.sum(Cos_score)) 
     Cos_score /= ((len(batch_grads)**2 + len(batch_grads))/2)
     print(Cos_score)
@@ -510,18 +511,14 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
             else:
                 batch_indexes = self.random_batch_indexes[index*self.batch_size:(index+1)*self.batch_size]
 
-            
-            self.scores = calc_batch_div(self.grads[batch_indexes], np.mean(self.grads,axis=0))
-            
         else:
             if len(self.set_indexes) <= self.batch_size:
                 batch_indexes = self.set_indexes
                 #calc div metric for batch
-                self.scores = calc_batch_div(self.grads[batch_indexes], np.mean(self.grads,axis=0))
             else:
                 #calc the mean gradient of the training set
                 mean_grad = np.mean(self.grads,axis=0)
-                batch_indexes =[]
+                batch_indexes = []
                 while len(batch_indexes) <= self.batch_size:
                     #score the distance of the batch and the item to the true gradient
                     if len(batch_indexes) == 0:
@@ -535,7 +532,10 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
                         #batch_plus_items_grads = [(batch_grad_sum+i)/(len(batch_indexes)+1) for i in self.grads[self.set_indexes]]
                         #D_bg = cdist(batch_plus_items_grads,[batch_grad_sum]).flatten() #dist between the mean of the batch and item to the true grad
                         #print(np.take_along_axis(self.grads,self.set_indexes,0))
-                        D_ib = np.min(cdist(np.take(self.grads, self.set_indexes, 0),np.take(self.grads, batch_indexes, 0),'cosine'),axis=1) #min dist from item to item in batch. size= avalible data
+                        d = cdist(np.take(self.grads, self.set_indexes, 0),np.take(self.grads, batch_indexes, 0),'cosine')
+                        print(d.shape)
+                        D_ib = np.min(d,axis=1) #min dist from item to item in batch. size= avalible data
+                        print(D_ib.shape)
 
                         #score = self.alpha * Norm(D_bg) + (1-self.alpha) * Norm(D_ib)
                         score = D_ib
@@ -543,15 +543,11 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
                         self.set_indexes = np.delete(self.set_indexes, np.argmax(score))
 
 
-                #calc div metric for batch
-                #
-                self.scores = calc_batch_div(np.take(self.grads, batch_indexes, 0), np.mean(self.grads,axis=0))
-
                 self.set_indexes = np.array(self.set_indexes) ##Not sure why this is here???
                 #print("images left in superset:",len(self.set_indexes))
                 #print("images in batch:",len(batch_indexes))
 
-
+        self.scores = calc_batch_div(np.take(self.grads, batch_indexes, 0), np.mean(self.grads,axis=0)) 
         #get the data for the batch
         imgs = self.imgs[batch_indexes]
         labels = self.labels[batch_indexes]
