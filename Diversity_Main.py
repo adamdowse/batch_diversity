@@ -53,10 +53,10 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "cifar10",
-        'group' : 'High_Cos_Div',
+        'group' : 'Normal_B32',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'model_name' : 'ResNet18',
@@ -65,11 +65,11 @@ def main():
         'optimizer' : 'Momentum', #SGD, Adam, Momentum
         'momentum' : 0.9,
         'random_db' : 'True', #False is wrong it adds the datasets together
-        'batch_size' : 128,
+        'batch_size' : 32,
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'start_defect_epoch' : 0,
+        'start_defect_epoch' : 1000,
         'defect_length' : 1000, # length of defect in epochs
         'max_its' : 46900,
         'epochs'    : 200, #if this != 0 then it will override max_its    

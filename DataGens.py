@@ -465,9 +465,8 @@ def calc_batch_div(batch_grads, mean_grad):
 
     Cos_score = np.sum(np.sum(Cos_score)) 
     Cos_score /= ((len(batch_grads)**2 + len(batch_grads))/2)
-    print(Cos_score)
 
-    Cos_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
+    Cos_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad],'Cosine')
 
     return [Euc_score,Euc_true,Cos_score,Cos_true]
 

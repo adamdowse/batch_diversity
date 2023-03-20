@@ -42,6 +42,8 @@ def Simple_CNN_Multi_Output(num_classes,in_shape,REG):
     return keras.Model(inp,[x,a])
 
 
+
+
 def All_CNN_noBN(num_classes,in_shape):
     #cnn arch used in crittical learnning point paper
     inp = keras.Input(in_shape)
