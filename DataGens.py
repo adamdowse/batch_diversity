@@ -546,7 +546,7 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
                 #print("images left in superset:",len(self.set_indexes))
                 #print("images in batch:",len(batch_indexes))
 
-        self.scores = calc_batch_div(np.take(self.grads, batch_indexes, 0), np.mean(self.grads,axis=0)) 
+        #self.scores = calc_batch_div(np.take(self.grads, batch_indexes, 0), np.mean(self.grads,axis=0)) 
         #get the data for the batch
         imgs = self.imgs[batch_indexes]
         labels = self.labels[batch_indexes]
@@ -581,6 +581,8 @@ class LocalSUBMODGRADDataGen(tf.keras.utils.Sequence):
     def get_grads(self,model,index,layer_name,delay):
         #get the approximate gradients from the last layer activations 
         #This is done for all the images each itt
+        #THIS HOLDS ALL GRADS 2x in memory and is baddddd
+        #Turn into a tf function and do incremetally with gpu
 
         print("Collecting Gradients")
         imgs = tf.cast(self.imgs,'float32')
