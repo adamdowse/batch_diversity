@@ -683,8 +683,8 @@ class LocalSUBMODGRADDataGenV2(tf.keras.utils.Sequence):
                             #dist between the mean of the batch and item to the true grad
                             batch_grad_sum = np.sum(np.take(self.grads, batch_indexes, 0),axis=0)
                             batch_plus_items_grads = [(batch_grad_sum+i)/(len(batch_indexes)+1) for i in np.take(self.grads, self.set_indexes, 0)] #batch + item for all items 
-                            D_bg = cdist(batch_plus_items_grads,[mean_grad],'cosine') #angle between (batch+items , mean_grad) [smaller is better]
-                            D_bg -= 2 #turn into a maximisation problem where larger is better
+                            D_bg = cdist(batch_plus_items_grads,[mean_grad],'cosine') #angle between (batch+items , mean_grad) 2 is opposite, 1 is orthog, 0 is same direction
+                            D_bg = 2 - D_bg #turn into a maximisation problem where larger is better 0 is opposite, 1 is orthog, 2 is same direction
                         else:
                             print("Skipping maximisation allignment step and setting zero")
                             D_bg = 1
