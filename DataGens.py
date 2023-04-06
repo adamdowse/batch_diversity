@@ -457,18 +457,18 @@ class LocalDivDataGen(tf.keras.utils.Sequence):
 
 def calc_batch_div(batch_grads, mean_grad):
     #use the gradients to calculate the diversity with measures (euclidean and cosine)
-    Euc_score = np.sum(np.sum(np.tril(cdist(batch_grads,batch_grads,'Euclidean')))) / ((len(batch_grads)**2 + len(batch_grads))/2)
-    Euc_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
+    #Euc_score = np.sum(np.sum(np.tril(cdist(batch_grads,batch_grads,'Euclidean')))) / ((len(batch_grads)**2 + len(batch_grads))/2)
+    #Euc_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad])
 
     
-    Cos_score = np.nan_to_num(np.tril(cdist(batch_grads,batch_grads,'Cosine')))
+    #Cos_score = np.nan_to_num(np.tril(cdist(batch_grads,batch_grads,'Cosine')))
 
-    Cos_score = np.sum(np.sum(Cos_score)) 
-    Cos_score /= ((len(batch_grads)**2 + len(batch_grads))/2)
+    #Cos_score = np.sum(np.sum(Cos_score)) 
+    #Cos_score /= ((len(batch_grads)**2 + len(batch_grads))/2)
 
     Cos_true = cdist([np.mean(batch_grads,axis=0)],[mean_grad],'Cosine')
 
-    return [Euc_score,Euc_true,Cos_score,Cos_true]
+    return Cos_true #[Euc_score,Euc_true,Cos_score,Cos_true]
 
 
 
@@ -716,7 +716,6 @@ class LocalSUBMODGRADDataGenV2(tf.keras.utils.Sequence):
         #get the data for the batch
         imgs = self.imgs[batch_indexes]
         labels = self.labels[batch_indexes]
-
 
         #convert to tensors THEY SHOULD REALLY BE STORED AS TENSORS
         imgs = tf.cast(np.array(imgs),'float32') 

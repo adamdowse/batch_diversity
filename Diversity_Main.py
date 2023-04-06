@@ -61,9 +61,9 @@ def main():
         'test_percent' : 0.1,
         'model_name' : 'ResNet18',
         'learning_rate' : 0.1,
-        'learning_rate_decay' : 0.97,
-        'optimizer' : 'Momentum', #SGD, Adam, Momentum
-        'momentum' : 0.9,
+        'learning_rate_decay' : 0,
+        'optimizer' : 'SGD', #SGD, Adam, Momentum
+        'momentum' : 0,
         'random_db' : 'True', #False is wrong it adds the datasets together
         'batch_size' : 128,
         'label_smoothing' : 0,
@@ -83,7 +83,7 @@ def main():
 
     #Setup
     wandb.init(project='New_Deep_Div',config=config)
-    calc_stats = False
+    calc_stats = True
 
     #Data Generator
     train_DG = DataGens.LocalSUBMODGRADDataGenV2(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'],config['alpha'],calc_stats=calc_stats)
@@ -176,11 +176,12 @@ def main():
             t1 = time.time()
             batch_data = train_DG.__getitem__(i)
             if calc_stats:
-                div_euc_score_avg += train_DG.get_div_score()[0]
-                true_euc_div_avg += train_DG.get_div_score()[1]
-                div_cos_score_avg += train_DG.get_div_score()[2]
-                true_cos_div_avg += train_DG.get_div_score()[3]
-                wandb.log({'Euc_Div':train_DG.get_div_score()[0],'True_Euc_Div':train_DG.get_div_score()[1],'Cos_Div':train_DG.get_div_score()[2],'True_Cos_Div':train_DG.get_div_score()[3]},step=batch_num)
+                #div_euc_score_avg += train_DG.get_div_score()[0]
+                #true_euc_div_avg += train_DG.get_div_score()[1]
+                #div_cos_score_avg += train_DG.get_div_score()[2]
+                true_cos_div_avg += train_DG.get_div_score()#[3]
+                #wandb.log({'Euc_Div':train_DG.get_div_score()[0],'True_Euc_Div':train_DG.get_div_score()[1],'Cos_Div':train_DG.get_div_score()[2],'True_Cos_Div':train_DG.get_div_score()[3]},step=batch_num)
+                #wandb.log({'True_Cos_Div':train_DG.get_div_score()},step=batch_num)
             t = time.time()
             train_step(batch_data[0],batch_data[1])
             print('Get data: ',t-t1,'train step time: ',time.time() - t)
@@ -194,7 +195,8 @@ def main():
 
         #Log metrics
         if calc_stats:
-            wandb.log({'Epoch_Euc_Div':div_euc_score_avg/train_DG.num_batches,'Epoch_True_Euc_Div':true_euc_div_avg/train_DG.num_batches,'Epoch_Cos_Div':div_cos_score_avg/train_DG.num_batches,'Epoch_True_Cos_Div':true_cos_div_avg/train_DG.num_batches},step=batch_num)
+            #wandb.log({'Epoch_Euc_Div':div_euc_score_avg/train_DG.num_batches,'Epoch_True_Euc_Div':true_euc_div_avg/train_DG.num_batches,'Epoch_Cos_Div':div_cos_score_avg/train_DG.num_batches,'Epoch_True_Cos_Div':true_cos_div_avg/train_DG.num_batches},step=batch_num)
+            wandb.log({'Epoch_True_Cos_Div':true_cos_div_avg/train_DG.num_batches},step=batch_num)
         wandb.log({'Train_loss':train_loss.result(),'Train_acc':train_acc_metric.result(),'Train_prec':train_prec_metric.result(),'Train_rec':train_rec_metric.result()},step=batch_num)
         wandb.log({'Test_loss':test_loss.result(),'Test_acc':test_acc_metric.result(),'Test_prec':test_prec_metric.result(),'Test_rec':test_rec_metric.result()},step=batch_num)
         wandb.log({'Epoch':epoch_num},step=batch_num)
