@@ -53,14 +53,14 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
-        'ds_name' : "cifar10",
-        'group' : 'A_0.5',
+        'ds_name' : "mnist",
+        'group' : 'test',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
-        'model_name' : 'ResNet18',
-        'learning_rate' : 0.1,
+        'model_name' : 'Simple_CNN_Multi_Output',
+        'learning_rate' : 0.001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
@@ -69,21 +69,21 @@ def main():
         'label_smoothing' : 0,
         'weight_decay' : 0,
         'data_aug' : '0', #0 = no data aug, 1 = data aug, 2 = data aug + noise
-        'start_defect_epoch' : 0,
+        'start_defect_epoch' : 1000,
         'defect_length' : 1000, # length of defect in epochs
         'max_its' : 46900,
         'epochs'    : 200, #if this != 0 then it will override max_its    
         'early_stop' : 5000,
         'subset_type' : 'All', #Random_Bucket, Hard_Mining, All
-        'train_type' : 'HighDiv', #SubMod, Random
+        'train_type' : 'Normal', #SubMod, Random
         'activation_delay' : 1, #cannot be 0 (used when submod is used)
         'activation_layer_name' : 'fc',
         'alpha' : 0.5, #0 is max seperation 1 is max alignment to mean
     }
 
     #Setup
-    wandb.init(project='New_Deep_Div',config=config)
-    calc_stats = True
+    wandb.init(project='FIM_Div_Review',config=config)
+    calc_stats = False
 
     #Data Generator
     train_DG = DataGens.LocalSUBMODGRADDataGenV2(config['ds_name'],config['batch_size'],config['train_percent'],config['ds_path'],config['alpha'],calc_stats=calc_stats)
@@ -172,7 +172,7 @@ def main():
 
         for i in range(train_DG.num_batches):
             #get the activations for the next batch selection
-            train_DG.get_grads(model,i,config["activation_layer_name"],config["activation_delay"])
+            #train_DG.get_grads(model,i,config["activation_layer_name"],config["activation_delay"])
             t1 = time.time()
             batch_data = train_DG.__getitem__(i)
             if calc_stats:
@@ -204,12 +204,12 @@ def main():
 
         #FIM Analysis
         train_DG.Epoch_init(True)
-        FIM_trace = fim.FIM_trace(train_DG,train_DG.num_classes,model) #return the approximate trace of the FIM
-        Test_FIM_trace = fim.FIM_trace(test_DG,train_DG.num_classes,model)
+        FIM_trace, FIM_trace_var = fim.FIM_trace_with_var(train_DG,train_DG.num_classes,model) #return the approximate trace of the FIM
+        Test_FIM_trace, Test_FIM_trace_var = fim.FIM_trace_with_var(test_DG,train_DG.num_classes,model)
 
         #Log FIM
         print('FIM Trace: ',FIM_trace)
-        wandb.log({'Approx_Trace_FIM': FIM_trace,"Test_Trace_FIM":Test_FIM_trace},step=batch_num)
+        wandb.log({'Approx_Trace_FIM': FIM_trace,"Test_Trace_FIM":Test_FIM_trace,'FIM_var': FIM_trace_var,"Test_FIM_var":Test_FIM_trace_var},step=batch_num)
 
         #Early stopping
         #if test_metrics[1] > early_stop_max:

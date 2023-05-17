@@ -82,7 +82,54 @@ def FIM_trace(data,total_classes,model):
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)
 
-    return fim
+    return 
+    
+def FIM_trace_with_var(data,total_classes,model): 
+    #data       = data ittorator like a genorator
+    #total_classes = the number of class outputs
+    #model      = tf model that returns the logits outputs for all classes
+    #calc fim diag
+    #t = time.time()
+    fim = 0
+    data_count = 0
+    msq = 0
+    for b in range(data.num_batches):
+        batch_data_input = data.__getitem__(b) [0]
+        for data_input in batch_data_input:
+            data_count += 1
+            #calc sum of squared grads for a data point and class square rooted
+            z = Get_Z(model,tf.expand_dims(data_input, axis=0))
+            if data_count == 1:
+                mean = z
+            delta = z - mean
+            mean += delta / (data_count+1) #Welford_cpp from web
+            msq += delta * (z - mean)
+
+        if data_count % 10000 == 0:
+            print(data_count)
+            break
+
+    return mean, msq/(data_count-1)
+
+
+#List welford_cpp(NumericVector x) {
+#   int n = x.length();
+#   double delta;
+#   double msq = 0;
+#   double mean = x[0];
+#   if (n > 1) {
+#     for (int i = 1; i < n; i++) { 
+#       delta = x[i] - mean;
+#       mean += delta / (i+1);
+#       msq += delta * (x[i] - mean);
+#     }
+#     return Rcpp::List::create(Rcpp::Named("mean") = mean,
+#                               Rcpp::Named("variance") = msq / (n-1));
+#   }
+#   return Rcpp::List::create(Rcpp::Named("mean") = mean,
+#                             Rcpp::Named("variance") = NAN);
+# }
+
 
 
 def Batch_FIM_trace(data,total_classes,model): 
