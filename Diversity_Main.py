@@ -30,7 +30,6 @@ def main():
         with tf.GradientTape() as tape:
             preds = model(imgs,training=True)[0]
             loss = loss_func(labels,preds)
-
         grads = tape.gradient(loss,model.trainable_variables)
         optimizer.apply_gradients(zip(grads,model.trainable_variables))
         train_loss(loss)
@@ -53,14 +52,14 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/com.docker.devenvironments.code/datasets/",
+        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "mnist",
-        'group' : 'test',
+        'group' : 'lr',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
         'model_name' : 'Simple_CNN_Multi_Output',
-        'learning_rate' : 0.001,
+        'learning_rate' : 0.05,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
@@ -201,15 +200,24 @@ def main():
         wandb.log({'Test_loss':test_loss.result(),'Test_acc':test_acc_metric.result(),'Test_prec':test_prec_metric.result(),'Test_rec':test_rec_metric.result()},step=batch_num)
         wandb.log({'Epoch':epoch_num},step=batch_num)
         
+        #Grad Analysis
+        train_DG.Epoch_init(True)
+        mean_grad_activity, mean_grad_var = fim.Grad_Div_Ensemble_Method(train_DG,model)
+        wandb.log({"mean_grad_activity":mean_grad_activity,"mean_grad_var":mean_grad_var},step=batch_num)
+
 
         #FIM Analysis
         train_DG.Epoch_init(True)
         FIM_trace, FIM_trace_var = fim.FIM_trace_with_var(train_DG,train_DG.num_classes,model) #return the approximate trace of the FIM
         Test_FIM_trace, Test_FIM_trace_var = fim.FIM_trace_with_var(test_DG,train_DG.num_classes,model)
-
-        #Log FIM
-        print('FIM Trace: ',FIM_trace)
         wandb.log({'Approx_Trace_FIM': FIM_trace,"Test_Trace_FIM":Test_FIM_trace,'FIM_var': FIM_trace_var,"Test_FIM_var":Test_FIM_trace_var},step=batch_num)
+
+        #EFIM Analysis
+        #train_DG.Epoch_init(True)
+        #EFIM,EFIM_var = fim.Emperical_FIM_trace_with_var(train_DG,train_DG.num_classes,model)
+        #wandb.log({'EFIM': EFIM,"EFIM_var":EFIM_var},step=batch_num)
+
+        
 
         #Early stopping
         #if test_metrics[1] > early_stop_max:
