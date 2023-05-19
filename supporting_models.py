@@ -41,7 +41,22 @@ def Simple_CNN_Multi_Output(num_classes,in_shape,REG):
     x = layers.Softmax()(x)
     return keras.Model(inp,[x,a])
 
+def Small_Simple_CNN_Multi_Output(num_classes,in_shape,REG): 
+    inp = keras.Input(in_shape)
 
+    x = layers.Conv2D(96,(3,3),activation='relu')(inp)
+    x = layers.BatchNormalization()(x)
+    #x = layers.MaxPool2D((2,2))(x)
+
+    x = layers.Conv2D(32,(3,3),activation='relu')(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.MaxPool2D((2,2))(x)
+    
+    x = layers.Flatten()(x)
+    a = layers.Dense(100, activation='relu')(x)
+    x = layers.Dense(num_classes)(a)
+    x = layers.Softmax()(x)
+    return keras.Model(inp,[x,a])
 
 
 def All_CNN_noBN(num_classes,in_shape):
@@ -71,6 +86,15 @@ def FullyConnected(num_classes,in_shape):
     x = layers.Softmax()(x)
     return keras.Model(inp,[x,a])
 
+def SmallFullyConnected(num_classes,in_shape):
+    inp = keras.Input(in_shape)
+    x = layers.Flatten()(inp)
+    x = layers.Dense(500,activation='relu')(x)
+    x = layers.Dense(250,activation='relu')(x)
+    a = layers.Dense(30,activation='relu')(x)
+    x = layers.Dense(num_classes,name="last_layer")(a)
+    x = layers.Softmax()(x)
+    return keras.Model(inp,[x,a])
 
 def AlexNet (num_classes,in_shape):
     model = tf.keras.Sequential([
@@ -308,6 +332,8 @@ def select_model(model_name,num_classes,img_shape,REG=0,getLLactivations=False):
         return Simple_CNN(num_classes,img_shape,REG)
     if model_name == 'Simple_CNN_Multi_Output':
         return Simple_CNN_Multi_Output(num_classes,img_shape,REG)
+    if model_name == 'Small_Simple_CNN_Multi_Output':
+        return Small_Simple_CNN_Multi_Output(num_classes,img_shape,REG)
     if model_name == 'AlexNet':
         return AlexNet(num_classes,img_shape)
     if model_name == 'EfficientNetV2B0_pretrained':
@@ -322,3 +348,5 @@ def select_model(model_name,num_classes,img_shape,REG=0,getLLactivations=False):
         return All_CNN_noBN(num_classes,img_shape)
     if model_name == 'FullyConnected':
         return FullyConnected(num_classes,img_shape)
+    if model_name == 'SmallFullyConnected':
+        return SmallFullyConnected(num_classes,img_shape)

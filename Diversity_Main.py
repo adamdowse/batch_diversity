@@ -52,14 +52,14 @@ def main():
     #/com.docker.devenvironments.code/datasets/
     #/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/
     config= {
-        'ds_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/datasets/",
+        'ds_path' : "/com.docker.devenvironments.code/datasets/",
         'db_path' : "/vol/research/NOBACKUP/CVSSP/scratch_4weeks/ad00878/DBs/",
         'ds_name' : "mnist",
         'group' : 'lr',
         'train_percent' : 0.1,
         'test_percent' : 0.1,
-        'model_name' : 'Simple_CNN_Multi_Output',
-        'learning_rate' : 0.05,
+        'model_name' : 'FullyConnected',
+        'learning_rate' : 0.00001,
         'learning_rate_decay' : 0,
         'optimizer' : 'SGD', #SGD, Adam, Momentum
         'momentum' : 0,
