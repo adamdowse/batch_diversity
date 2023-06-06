@@ -6,7 +6,7 @@ tensorflow_datasets
 tensorflow_probability
 pyyaml
 h5py
-sklearn
+scikit-learn
 opencv-python
 wandb
 dppy
