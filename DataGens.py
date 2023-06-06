@@ -27,8 +27,35 @@ def imgsAndLabelsFromTFDataset(DS):
         num_batches += 1
         imgs_store.append(imgs)
         labels_store.append(labels)
+
+    #normalise
+    imgs_store = np.array(imgs_store) #size = [batches, imgsdimx, imgsdimy, depth]
+    i_max = np.max(imgs_store)
+    i_min = np.min(imgs_store)
     return (np.array(imgs_store),np.array(labels_store),num_batches)
 
+
+def collectInfoFromTFDataset(DS):
+    #itterate through a dataset and record stats to normalise with later.
+    #this is done with tf vars.
+    #DS can be batched or not, reduce max/min is taking a global reduction.
+    t_min = tf.constant(10000.,dtype=tf.float32)
+    t_max = tf.constant(0.,dtype=tf.float32)
+    count = 0
+    for img, label in DS:
+        count += 1
+        img = tf.cast(img,'float32')
+
+        #loop though the dataset
+        i_min = tf.reduce_min(img)
+        if tf.math.less(i_min, t_min):
+            t_min = i_min
+
+        i_max = tf.reduce_max(img)
+        if tf.math.greater(i_max, t_max):
+            t_max = i_max
+    
+    return t_min,t_max,count
 
 
 def Norm(A):
@@ -88,7 +115,7 @@ def Feature_Match_Score(activations,set_indexes,batch_indexes):
 
 class TestDataGen(tf.keras.utils.Sequence):
     def __init__(self, ds_name, batch_size, size, ds_dir, Download=True):
-        print('INIT: Using ',ds_name, ' test data')
+        print('INIT: Using ',size*100,"'%' of",ds_name, ' test data')
         test_split = 'test[:'+str(int(size*100))+'%]'
         test_ds,info = tfds.load(ds_name,with_info=True,shuffle_files=False,as_supervised=True,split=test_split,data_dir=ds_dir,download=Download)
 
@@ -96,11 +123,17 @@ class TestDataGen(tf.keras.utils.Sequence):
         self.batch_size = batch_size
 
         self.num_classes = info.features['label'].num_classes
-        self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(self.test_ds)
-        
+        self.imgs_min, self.imgs_max, self.num_batches = collectInfoFromTFDataset(self.test_ds)
+        print("Found min = ",self.imgs_min," max = ", self.imgs_max,"Using this to normalise the data to [0,1]")
+        print("Batches: ",self.num_batches)
         
     def __getitem__(self, index):
-        return (tf.cast(self.imgs[index],'float32'), tf.one_hot(self.labels[index],self.num_classes),)
+        #this is what is called when the generator is called.
+        for imgs, labels in self.test_ds.skip(index).take(1):
+            imgs = tf.cast(imgs,'float32')
+            imgs = (imgs - self.imgs_min)/(self.imgs_max - self.imgs_min)
+            labels = tf.one_hot(labels,self.num_classes)
+        return (imgs, labels,)
     
     def __len__(self):
         return self.num_batches
@@ -631,8 +664,9 @@ class LocalSUBMODGRADDataGenV2(tf.keras.utils.Sequence):
         train_split = 'train[:'+str(int(size*100))+'%]' 
         train_ds, info = tfds.load(ds_name,with_info=True,shuffle_files=False,as_supervised=True,split=train_split,data_dir=ds_dir,download=Download)
 
+        self.img_min, self.img_max, _ = collectInfoFromTFDataset(train_ds)
 
-        #init db connection and init vars
+        #init vars
         self.calc_stats = calc_stats
         self.num_classes = info.features['label'].num_classes
         self.class_names = info.features['label'].names
@@ -644,6 +678,7 @@ class LocalSUBMODGRADDataGenV2(tf.keras.utils.Sequence):
 
         self.data_used = np.zeros(self.num_images,dtype=int)
 
+        #sadly we need to store the dataset locally 
         self.imgs, self.labels, self.num_batches = imgsAndLabelsFromTFDataset(train_ds)
 
         #Logging
@@ -719,6 +754,7 @@ class LocalSUBMODGRADDataGenV2(tf.keras.utils.Sequence):
 
         #convert to tensors THEY SHOULD REALLY BE STORED AS TENSORS
         imgs = tf.cast(np.array(imgs),'float32') 
+        imgs = (imgs - self.img_min) / (self.img_max - self.img_min)
         labels = tf.one_hot(np.array(labels),self.num_classes)
         return (imgs, labels,)
     
