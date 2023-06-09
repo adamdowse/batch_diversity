@@ -1,5 +1,5 @@
 universe = docker
-docker_image = registry.eps.surrey.ac.uk/adamsdocker:44412
+docker_image = container-registry.surrey.ac.uk/shared-containers/ad00878:SHA_7c5920db
 
 executable = /usr/bin/python3
 arguments = $ENV(PWD)/Diversity_Main.py
