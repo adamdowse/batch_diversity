@@ -103,14 +103,15 @@ def main():
 
     #Optimizer
     class lr_schedule():
-        def __init__(self,k,init_lr=config['learning_rate']):
+        def __init__(self,k,init_lr=config['learning_rate'],method=0):
             self.itt_num = 0
             self.FIM_store = []
             self.k = k
             self.LR_store = []
             self.init_lr = init_lr
             self.lr = init_lr
-            self.exp_mult = 0.05
+            self.exp_mult = 0.01
+            self.method = method
             
 
         def __call__(self):
@@ -118,18 +119,29 @@ def main():
                 self.LR_store.append(self.lr)
                 return self.lr
             else:
-                #calculate the average change of the FIM on the latest k items
-                print(self.FIM_store)
-                print(self.LR_store)
-                #fit = np.polyfit(self.LR_store[-self.k:],self.FIM_store[-self.k:],1) #can add a weighting here if needed
-                fit = np.polyfit(np.arange(self.k),self.FIM_store[-self.k:],1)
-                g = fit[0]
-                print('g: ',g)
-                #update the learning rate
-                self.lr = self.lr * np.exp(self.exp_mult*g)
-                #store the learning rate
-                self.LR_store.append(self.lr)
-                return self.lr
+                if method == 0:
+                    #calculate the average change of the FIM on the latest k items
+                    print(self.FIM_store)
+                    print(self.LR_store)
+                    #fit = np.polyfit(self.LR_store[-self.k:],self.FIM_store[-self.k:],1) #can add a weighting here if needed
+                    fit = np.polyfit(np.arange(self.k),self.FIM_store[-self.k:],1)
+                    g = fit[0]
+                    print('g: ',g)
+                    #update the learning rate
+                    self.lr = self.lr * np.exp(self.exp_mult*g)
+                    #store the learning rate
+                    self.LR_store.append(self.lr)
+                    return self.lr
+                elif method == 1:
+                    #method to change lr based on the convergence of FIM
+                    #if FIM has been decreasing for the last k iterations then decrease the learning rate
+
+                    fit = np.polyfit(np.arange(self.k),self.FIM_store[-self.k:],1)
+                    g = fit[0]
+                    if g < 0:
+                        self.lr = self.lr * np.exp(self.exp_mult*g)
+                    self.LR_store.append(self.lr)
+                    return self.lr
         
         def update(self,FIM):
             self.FIM_store.append(FIM)
