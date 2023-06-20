@@ -82,7 +82,6 @@ def FIM_trace(data,total_classes,model):
     #think about adding var calc too
     fim /= data_count
     #print('FIM trace calc time:',time.time()-t)
-
     return 
     
 def FIM_trace_with_var(data,total_classes,model): 
