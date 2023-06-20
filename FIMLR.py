@@ -119,7 +119,7 @@ def main():
                 self.LR_store.append(self.lr)
                 return self.lr
             else:
-                if method == 0:
+                if self.method == 0:
                     #calculate the average change of the FIM on the latest k items
                     print(self.FIM_store)
                     print(self.LR_store)
@@ -132,7 +132,7 @@ def main():
                     #store the learning rate
                     self.LR_store.append(self.lr)
                     return self.lr
-                elif method == 1:
+                elif self.method == 1:
                     #method to change lr based on the convergence of FIM
                     #if FIM has been decreasing for the last k iterations then decrease the learning rate
 
@@ -144,6 +144,8 @@ def main():
                     return self.lr
         
         def update(self,FIM):
+            if FIM == None:
+                FIM = 0
             self.FIM_store.append(FIM)
             return
 
