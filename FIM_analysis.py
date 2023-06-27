@@ -217,7 +217,7 @@ def Grad_Div_Ensemble_Method(data,model):
     return np.sqrt(np.sum(np.power(g_mean, 2))) , g_cos_to_mean
 
 @tf.function
-def Get_Losses(model,x,y,loss_func):
+def Get_Losses(model,x,y,lf):
     #returns the loss value for a given x and y
     with tf.GradientTape() as tape:
         output = model(x,training=False)[0]
@@ -260,12 +260,13 @@ def CurvatureEstimate(model,data,n_error_scales,n_data_points):
 
 
     print('Calculating Curvature At Multiple Scales')
-    curvature = np.zeros(n_error_scales+1) #holds the curvature estimates and the FIM trace in position 0
-    curv_var = np.zeros(n_error_scales+1) #holds the curvature estimates varitation over data and the FIM trace in position 0
+    t = time.time()
+    curvature = np.zeros(len(n_error_scales)+1) #holds the curvature estimates and the FIM trace in position 0
+    curv_var = np.zeros(len(n_error_scales)+1) #holds the curvature estimates varitation over data and the FIM trace in position 0
     lf = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
 
     #Calculate the FIM trace
-    curvature[0], curv_var[0] = FIM_trace_with_var_extended(data,model,n_data_points)
+    #curvature[0], curv_var[0] = FIM_trace_with_var_extended(data,model,n_data_points)
 
     #Calculate the curvature at different scales
     for i in n_error_scales:
@@ -276,30 +277,35 @@ def CurvatureEstimate(model,data,n_error_scales,n_data_points):
         msq = 0
         for b in range(data.num_batches):
             batch_data_input = data.__getitem__(b)
-            for data_input in tf.stack(batch_data_input,axis=1): #stack the batch data so [[x1,x2,x3],[y1,y2,y3]] -> [[x1,y1],[x2,y2],[x3,y3]]
-                data_count += 1
-                #calc the loss at the current point
-                w0_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                #Get a random direction scaled by the error scale
-                rand_direction = i * np.random.randn(count_params(model.trainable_variables)) #random vector of size of the weights from noraml dist with mean 0 and var 1
-                #update model with the random direction
-                model.set_weights(model.get_weights() + rand_direction)
-                #calc the loss at the new point
-                w1_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                #update the model by 2x the random direction in the opposite direction
-                model.set_weights(model.get_weights() - 2*rand_direction)
-                #calc the loss at the new point
-                w2_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                #update the model back to the original point
-                model.set_weights(model.get_weights() + rand_direction)
-                #calc the curvature
-                c = (w1_loss + w2_loss - 2*w0_loss)/(4*np.linalg.norm(rand_direction))
-                if data_count == 1:
-                    mean = c
-                delta = c - mean
-                mean += delta / (data_count+1)
-                msq += delta * (c - mean)
+            #THIS IS WHERE I NEED TO CHANGE IT
+            for [x,y] in batch_data_input: #stack the batch data so [[x1,x2,x3],[y1,y2,y3]] -> [[x1,y1],[x2,y2],[x3,y3]]
+                for i in range(x.shape[0]):
+                    data_count += 1
+                    #calc the loss at the current point
+                    w0_loss = Get_Losses(model,data_input[0],data_input[1],lf)
+                    #Get a random direction scaled by the error scale
+                    rand_direction = i * np.random.randn(count_params(model.trainable_variables)) #random vector of size of the weights from noraml dist with mean 0 and var 1
+                    #update model with the random direction
+                    model.set_weights(model.get_weights() + rand_direction)
+                    #calc the loss at the new point
+                    w1_loss = Get_Losses(model,data_input[0],data_input[1],lf)
+                    #update the model by 2x the random direction in the opposite direction
+                    model.set_weights(model.get_weights() - 2*rand_direction)
+                    #calc the loss at the new point
+                    w2_loss = Get_Losses(model,data_input[0],data_input[1],lf)
+                    #update the model back to the original point
+                    model.set_weights(model.get_weights() + rand_direction)
+                    #calc the curvature
+                    c = (w1_loss + w2_loss - 2*w0_loss)/(4*np.linalg.norm(rand_direction))
+                    if data_count == 1:
+                        mean = c
+                    delta = c - mean
+                    mean += delta / (data_count+1)
+                    msq += delta * (c - mean)
 
+                    if data_count % n_data_points == 0:
+                        print(data_count)
+                        break
                 if data_count % n_data_points == 0:
                     print(data_count)
                     break
@@ -308,6 +314,7 @@ def CurvatureEstimate(model,data,n_error_scales,n_data_points):
                 break
         curvature[i+1] = mean
         curv_var[i+1] = msq/(data_count-1)
+    print('Curvature Calculation Time: ',time.time()-t)
     
     return curvature, curv_var
 
