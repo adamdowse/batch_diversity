@@ -283,15 +283,17 @@ def CurvatureEstimate(model,data,n_error_scales,n_data_points):
             y_batch = batch_data_input[1]
             for i in range(x_batch.shape[0]):
                 data_count += 1
-                if data_count % 5000 == 0:
-                    print(data_count)
+                if data_count % 1 == 0:
+                    et = time.time()
+                if data_count % 100 == 0:
+                    print("estimated run time =",n_data_points/100*(et-time.time()/60),"mins")
                 x = tf.expand_dims(x_batch[i],axis=0)
                 y = tf.expand_dims(y_batch[i],axis=0)
                 
                 #calc the loss at the current point
                 w0_loss = Get_Losses(model,x,y,lf)
                 #Get a random direction scaled by the error scale
-                rand_direction = [i*tf.random.normal([w],mean=0,stddev=1) for w in weights_shape]
+                rand_direction = [i*tf.random.normal(w,mean=0,stddev=1) for w in weights_shape]
                 #update model with the random direction
                 for l in range(len(weights_shape)):
                     model.trainable_variables[l].assign_add(rand_direction[l])
