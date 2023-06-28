@@ -275,37 +275,45 @@ def CurvatureEstimate(model,data,n_error_scales,n_data_points):
         print('Calculating Curvature At Scale: ',i)
         data_count = 0
         msq = 0
+        #get the shape of the weights in each layer
+        weights_shape = [w.shape for w in model.trainable_variables]
         for b in range(data.num_batches):
             batch_data_input = data.__getitem__(b)
-            #THIS IS WHERE I NEED TO CHANGE IT
-            for [x,y] in batch_data_input: #stack the batch data so [[x1,x2,x3],[y1,y2,y3]] -> [[x1,y1],[x2,y2],[x3,y3]]
-                for i in range(x.shape[0]):
-                    data_count += 1
-                    #calc the loss at the current point
-                    w0_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                    #Get a random direction scaled by the error scale
-                    rand_direction = i * np.random.randn(count_params(model.trainable_variables)) #random vector of size of the weights from noraml dist with mean 0 and var 1
-                    #update model with the random direction
-                    model.set_weights(model.get_weights() + rand_direction)
-                    #calc the loss at the new point
-                    w1_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                    #update the model by 2x the random direction in the opposite direction
-                    model.set_weights(model.get_weights() - 2*rand_direction)
-                    #calc the loss at the new point
-                    w2_loss = Get_Losses(model,data_input[0],data_input[1],lf)
-                    #update the model back to the original point
-                    model.set_weights(model.get_weights() + rand_direction)
-                    #calc the curvature
-                    c = (w1_loss + w2_loss - 2*w0_loss)/(4*np.linalg.norm(rand_direction))
-                    if data_count == 1:
-                        mean = c
-                    delta = c - mean
-                    mean += delta / (data_count+1)
-                    msq += delta * (c - mean)
+            x_batch = batch_data_input[0]
+            y_batch = batch_data_input[1]
+            for i in range(x_batch.shape[0]):
+                data_count += 1
+                if data_count % 5000 == 0:
+                    print(data_count)
+                x = tf.expand_dims(x_batch[i],axis=0)
+                y = tf.expand_dims(y_batch[i],axis=0)
+                
+                #calc the loss at the current point
+                w0_loss = Get_Losses(model,x,y,lf)
+                #Get a random direction scaled by the error scale
+                rand_direction = [i*tf.random.normal([w],mean=0,stddev=1) for w in weights_shape]
+                #update model with the random direction
+                for l in range(len(weights_shape)):
+                    model.trainable_variables[l].assign_add(rand_direction[l])
+                #calc the loss at the new point
+                w1_loss = Get_Losses(model,x,y,lf)
+                #update the model by 2x the random direction in the opposite direction
+                for l in range(len(weights_shape)):
+                    model.trainable_variables[l].assign_add(-2*rand_direction[l])
+                #calc the loss at the new point
+                w2_loss = Get_Losses(model,x,y,lf)
+                #update the model back to the original point
+                for l in range(len(weights_shape)):
+                    model.trainable_variables[l].assign_add(rand_direction[l])
+                #calc the curvature
+                concat_rand_direction = tf.concat([tf.reshape(r,[-1]) for r in rand_direction],0)
+                c = (w1_loss + w2_loss - 2*w0_loss)/(4*np.linalg.norm(concat_rand_direction))
+                if data_count == 1:
+                    mean = c
+                delta = c - mean
+                mean += delta / (data_count+1)
+                msq += delta * (c - mean)
 
-                    if data_count % n_data_points == 0:
-                        print(data_count)
-                        break
                 if data_count % n_data_points == 0:
                     print(data_count)
                     break
